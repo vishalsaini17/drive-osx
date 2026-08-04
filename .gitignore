@@ -1,0 +1,11 @@
+node_modules/
+build/
+dist/
+coverage/
+drive-osx-api/
+drive-osx-mail/
+drive-osx-ui/
+.DS_Store
+*.log
+.env*
+!.env.example

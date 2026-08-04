@@ -1,0 +1,82 @@
+services:
+  drive-osx-ui:
+    build:
+      context: ./drive-osx-ui
+    ports:
+      - "${UI_PORT:-3000}:80"
+    depends_on:
+      drive-osx-api:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  drive-osx-api:
+    build:
+      context: ./drive-osx-api
+    env_file:
+      - ./drive-osx-api/.env
+    environment:
+      NODE_ENV: production
+      PORT: 7000
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+    ports:
+      # Kept on 3001 externally for compatibility with the UI's local setup.
+      - "${API_PORT:-3001}:7000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7000/api/v1/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      mongo:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  drive-osx-mail:
+    build:
+      context: ./drive-osx-mail
+    env_file:
+      - ./drive-osx-mail/.env
+    environment:
+      PORT: 2525
+      HOST: 0.0.0.0
+      API_BASE_URL: http://drive-osx-api:7000
+    ports:
+      # Kept on 1025 externally for compatibility with the previous Compose file.
+      - "${SMTP_PORT:-1025}:2525"
+    depends_on:
+      drive-osx-api:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:8
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-drive}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo-data:

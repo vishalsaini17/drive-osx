@@ -2,20 +2,8 @@ services:
   drive-osx-ui:
     build:
       context: ./drive-osx-ui
-      dockerfile: ${UI_DOCKERFILE:-Dockerfile.dev}
-    volumes:
-      - ./drive-osx-ui:/app
-      - /app/node_modules
-    command: ${UI_COMMAND:-npm run dev}
     ports:
-      - "${UI_PORT:-3000}:${UI_CONTAINER_PORT:-3000}"
-    depends_on:
-      drive-osx-api:
-        condition: service_healthy
-    environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - VITE_API_BASE_URL=http://drive-osx-api:7000/api/v1
-    init: true
+      - "${UI_PORT:-80}:80"
     restart: unless-stopped
     networks:
       - app-network
@@ -23,29 +11,17 @@ services:
   drive-osx-api:
     build:
       context: ./drive-osx-api
-      dockerfile: ${API_DOCKERFILE:-Dockerfile.dev}
     env_file:
       - ./drive-osx-api/.env
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: production
       PORT: 7000
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
     ports:
-      - "${API_PORT:-3001}:${API_CONTAINER_PORT:-7000}"
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7000/api/v1/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
+      - "${API_PORT:-7000}:7000"
     depends_on:
       mongo:
         condition: service_healthy
-    volumes:
-      - ./drive-osx-api:/app
-      - /app/node_modules
-    command: ${API_COMMAND:-npm run dev}
-    init: true
     restart: unless-stopped
     networks:
       - app-network
@@ -53,25 +29,18 @@ services:
   drive-osx-mail:
     build:
       context: ./drive-osx-mail
-      dockerfile: ${MAIL_DOCKERFILE:-Dockerfile.dev}
     env_file:
       - ./drive-osx-mail/.env
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: production
       PORT: 2525
       HOST: 0.0.0.0
       API_BASE_URL: http://drive-osx-api:7000
-      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
     ports:
-      - "${SMTP_PORT:-1025}:${SMTP_CONTAINER_PORT:-2525}"
+      - "${SMTP_PORT:-1025}:2525"
     depends_on:
       drive-osx-api:
         condition: service_healthy
-    volumes:
-      - ./drive-osx-mail:/app
-      - /app/node_modules
-    command: ${MAIL_COMMAND:-npm run dev}
-    init: true
     restart: unless-stopped
     networks:
       - app-network

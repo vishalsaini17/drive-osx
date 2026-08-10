@@ -10,3 +10,4 @@ drive-osx-ui/
 .env*
 !.env.example
 .kilo
+.continue

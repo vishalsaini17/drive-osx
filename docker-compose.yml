@@ -16,7 +16,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 7000
-      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_URI: mongodb://drive-osx-db:drive-osx-psd@mongo:27017/drive?authSource=admin
     ports:
       - "${API_PORT:-7000}:7000"
     depends_on:
@@ -49,6 +49,11 @@ services:
     image: mongo:8
     environment:
       MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-drive}
+      MONGO_INITDB_ROOT_USERNAME: drive-osx-db
+      MONGO_INITDB_ROOT_PASSWORD: drive-osx-psd
+
+    ports:
+      - "27017:27017"
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -60,6 +65,18 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+
+  Mongo-express:
+   image: mongo-express
+   ports:
+   - 8081:8081
+   environment:
+     ME_CONFIG_MONGODB_ADMINUSERNAME: drive-osx-db
+     ME_CONFIG_MONGODB_ADMINPASSWORD: drive-osx-psd
+     ME_CONFIG_MONGODB_URL: mongodb://drive-osx-db:drive-osx-psd@mongo:27017/drive?authSource=admin
+   networks:
+      - app-network
+
 
 networks:
   app-network:

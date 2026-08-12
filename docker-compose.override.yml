@@ -33,7 +33,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 7000
-      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/drive}
       MONGO_DB_NAME: drive
       JWT_SECRET: drive-osx-secret
       API_VERSION: v1

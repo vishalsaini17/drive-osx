@@ -16,7 +16,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 7000
-      MONGO_URI: mongodb://drive-osx-db:drive-osx-psd@mongo:27017/drive?authSource=admin
+      MONGO_URI: mongodb://mongo:27017/drive
     ports:
       - "${API_PORT:-7000}:7000"
     depends_on:
@@ -49,15 +49,13 @@ services:
     image: mongo:8
     environment:
       MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-drive}
-      MONGO_INITDB_ROOT_USERNAME: drive-osx-db
-      MONGO_INITDB_ROOT_PASSWORD: drive-osx-psd
-
     ports:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      test:
+        ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -66,17 +64,22 @@ services:
     networks:
       - app-network
 
-  Mongo-express:
-   image: mongo-express
-   ports:
-   - 8081:8081
-   environment:
-     ME_CONFIG_MONGODB_ADMINUSERNAME: drive-osx-db
-     ME_CONFIG_MONGODB_ADMINPASSWORD: drive-osx-psd
-     ME_CONFIG_MONGODB_URL: mongodb://drive-osx-db:drive-osx-psd@mongo:27017/drive?authSource=admin
-   networks:
+  mongo-express:
+    image: mongo-express:latest
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/drive
+      ME_CONFIG_BASICAUTH_ENABLED: "false"
+      ME_CONFIG_BASICAUTH: "false"
+      ME_CONFIG_BASICAUTH_USERNAME: ""
+      ME_CONFIG_BASICAUTH_PASSWORD: ""
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
       - app-network
-
 
 networks:
   app-network:

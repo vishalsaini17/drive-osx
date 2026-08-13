@@ -6,7 +6,31 @@ Spreadsheets, Presentations, Mail, Meetings, Chat, Calculator and more — on a
 multi-tenant platform.
 
 Architecture principles and long-term direction live in [CLAUDE.md](CLAUDE.md);
-the concrete implementation is described in [docs/architecture.md](docs/architecture.md).
+the concrete implementation is described in [Architecture](docs/architecture.md).
+
+## Documentation
+
+All of it lives in **[docs/](docs/README.md)**, which indexes the rest.
+
+**New here? Start with [System Overview](docs/overview.md)** — the shortest
+path to understanding the system well enough to change it safely.
+
+| Document | Answers |
+| --- | --- |
+| [System Overview](docs/overview.md) | How does the whole thing work? |
+| [Architecture](docs/architecture.md) | How is it actually built? |
+| [Application Inventory](docs/reference/applications.md) | What exists, and does it really work? |
+| [Integration Map](docs/reference/integration-map.md) | What breaks if I change this? |
+| [Audit and Plan](docs/status/audit-and-plan.md) | What is known to be broken or missing? |
+| [Testing](docs/guides/testing.md) | How do I verify a change? |
+| [Developer Guide](docs/guides/developer-guide.md) | How do I work in this repository? |
+| [Decision records](docs/architecture/decisions/) | Why was it done this way? |
+| [Feature guides](docs/features/) | How does one feature work end to end? |
+| [Windows and the dock](docs/features/shell-windows-and-dock.md) | How does the desktop shell behave? |
+
+Two application areas hold data that only lives in the browser — Calendar, and
+the document editors. `docs/reference/applications.md` says which, per application,
+so nothing has to be assumed.
 
 ## Stack
 
@@ -245,6 +269,12 @@ PY
 ```
 
 The message appears in that account's inbox in the Mail application.
+
+Sending through SMTP on port 1025 is the only supported route. Posting directly
+to `/api/v1/mail/receive` requires the `MAIL_GATEWAY_TOKEN` header — inbound
+delivery is authenticated so that nobody can inject mail with a forged sender.
+If deliveries start returning `401`, the token differs between
+`drive-osx-api/.env` and `drive-osx-mail/.env`.
 
 ## Troubleshooting
 

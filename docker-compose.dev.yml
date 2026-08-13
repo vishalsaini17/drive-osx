@@ -1,0 +1,116 @@
+# Development layer, applied on top of docker-compose.yml.
+#
+# Selected by COMPOSE_FILE in .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml   → development
+#   COMPOSE_FILE=docker-compose.yml                          → production
+#
+# Each service is built from its `dev` target and runs its watch command with
+# the source bind-mounted. Health checks come from the images themselves.
+#
+# The bind mounts below are why this cannot collapse into the base file: Compose
+# has no way to omit a volume based on a variable.
+services:
+  drive-osx-ui:
+    image: drive-osx/ui:dev
+    build:
+      target: dev
+    volumes:
+      - type: bind
+        source: ./drive-osx-ui
+        target: /app
+        bind:
+          create_host_path: true
+          selinux: z
+      # Keep the image's node_modules; the host's are not used inside the container.
+      - /app/node_modules
+    command: npm run dev
+    ports: !override
+      - "${UI_DEV_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: development
+      VITE_API_BASE_URL: /api/v1
+    depends_on:
+      drive-osx-api:
+        condition: service_healthy
+    restart: on-failure
+
+  drive-osx-api:
+    image: drive-osx/api:dev
+    build:
+      target: dev
+    environment:
+      NODE_ENV: development
+      PORT: 7000
+      LOG_LEVEL: debug
+      DATABASE_URL: postgres://${POSTGRES_USER:-drive}:${POSTGRES_PASSWORD:-drive}@postgres:5432/${POSTGRES_DB:-drive}
+      REDIS_URL: redis://redis:6379
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-driveosx}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-driveosx-secret}
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-http://localhost:9000}
+    ports: !override
+      - "${API_DEV_PORT:-3001}:7000"
+    volumes:
+      - type: bind
+        source: ./drive-osx-api
+        target: /app
+        bind:
+          create_host_path: true
+          selinux: z
+      - /app/node_modules
+    command: npm run dev
+    restart: on-failure
+
+  drive-osx-worker:
+    image: drive-osx/api:dev
+    build:
+      target: dev
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      DATABASE_URL: postgres://${POSTGRES_USER:-drive}:${POSTGRES_PASSWORD:-drive}@postgres:5432/${POSTGRES_DB:-drive}
+      REDIS_URL: redis://redis:6379
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-driveosx}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-driveosx-secret}
+      WORKER_HEALTH_PORT: 7001
+    volumes:
+      - type: bind
+        source: ./drive-osx-api
+        target: /app
+        bind:
+          create_host_path: true
+          selinux: z
+      - /app/node_modules
+    command: npm run dev:worker
+    restart: on-failure
+
+  drive-osx-mail:
+    image: drive-osx/mail:dev
+    build:
+      target: dev
+    environment:
+      NODE_ENV: development
+      PORT: 2525
+      HOST: 0.0.0.0
+      API_BASE_URL: http://drive-osx-api:7000
+    volumes:
+      - type: bind
+        source: ./drive-osx-mail
+        target: /app
+        bind:
+          create_host_path: true
+          selinux: z
+      - /app/node_modules
+    command: npm run dev
+    restart: on-failure
+
+  # Datastore ports are published in development so services can also be run
+  # directly on the host against this infrastructure.
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"

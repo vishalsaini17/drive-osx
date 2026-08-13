@@ -1,34 +1,124 @@
+# Production-shaped stack — the base layer, and the default.
+#
+# Which stack `docker compose up` runs is decided by COMPOSE_FILE in .env:
+#   COMPOSE_FILE=docker-compose.yml                          → this file only
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml   → plus development
+#
+# Images are pinned, containers run unprivileged with no capability to gain new
+# privileges, logs are bounded, and every service reports health.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  # Node and nginx do not need to reap children; init handles zombies if they appear.
+  init: true
+
 services:
   drive-osx-ui:
+    # Mode-tagged image: switching COMPOSE_FILE can never silently reuse the
+    # development artefact, and a missing tag triggers a build automatically.
+    image: drive-osx/ui:prod
     build:
       context: ./drive-osx-ui
+      target: production
+      args:
+        # Baked into the bundle at build time; the relative path works because
+        # nginx proxies /api to the API container.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    <<: *hardening
+    # nginx-unprivileged serves on 8080 as uid 101.
     ports:
-      - "${UI_PORT:-3000}:3000"
+      - "${UI_PORT:-80}:8080"
+    depends_on:
+      drive-osx-api:
+        condition: service_healthy
     restart: unless-stopped
-    networks:
-      - app-network
+    logging: *default-logging
+    networks: [app-network]
 
   drive-osx-api:
+    image: drive-osx/api:prod
     build:
       context: ./drive-osx-api
+      target: production
+    <<: *hardening
     env_file:
       - ./drive-osx-api/.env
     environment:
       NODE_ENV: production
       PORT: 7000
-      MONGO_URI: mongodb://mongo:27017/drive
+      DATABASE_URL: postgres://${POSTGRES_USER:-drive}:${POSTGRES_PASSWORD:-drive}@postgres:5432/${POSTGRES_DB:-drive}
+      REDIS_URL: redis://redis:6379
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-driveosx}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-driveosx-secret}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-drive-osx}
+      # Signed URLs are redeemed by the browser, not by the API container.
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-http://localhost:9000}
     ports:
       - "${API_PORT:-7000}:7000"
     depends_on:
-      mongo:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     restart: unless-stopped
-    networks:
-      - app-network
+    logging: *default-logging
+    networks: [app-network]
+
+  # Background jobs and the domain-event outbox. A separate process so slow work
+  # never blocks an API request, and so it can be scaled independently.
+  drive-osx-worker:
+    # Same image as the API; only the command differs.
+    image: drive-osx/api:prod
+    build:
+      context: ./drive-osx-api
+      target: production
+    command: ["node", "dist/worker.js"]
+    <<: *hardening
+    env_file:
+      - ./drive-osx-api/.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-drive}:${POSTGRES_PASSWORD:-drive}@postgres:5432/${POSTGRES_DB:-drive}
+      REDIS_URL: redis://redis:6379
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-driveosx}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-driveosx-secret}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-drive-osx}
+      WORKER_HEALTH_PORT: 7001
+    # The worker talks to the datastores directly; it does not need the API.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    logging: *default-logging
+    networks: [app-network]
 
   drive-osx-mail:
+    image: drive-osx/mail:prod
     build:
       context: ./drive-osx-mail
+      target: production
+    <<: *hardening
     env_file:
       - ./drive-osx-mail/.env
     environment:
@@ -42,48 +132,77 @@ services:
       drive-osx-api:
         condition: service_healthy
     restart: unless-stopped
-    networks:
-      - app-network
+    logging: *default-logging
+    networks: [app-network]
 
-  mongo:
-    image: mongo:8
+  postgres:
+    image: postgres:17.2-alpine
+    <<: *hardening
     environment:
-      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-drive}
-    ports:
-      - "27017:27017"
+      POSTGRES_USER: ${POSTGRES_USER:-drive}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drive}
+      POSTGRES_DB: ${POSTGRES_DB:-drive}
+      # Fail the build of the cluster rather than silently allowing trust auth.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     volumes:
-      - mongo-data:/data/db
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-drive} -d ${POSTGRES_DB:-drive}"]
+      interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 12
       start_period: 10s
     restart: unless-stopped
-    networks:
-      - app-network
+    logging: *default-logging
+    networks: [app-network]
 
-  mongo-express:
-    image: mongo-express:latest
-    ports:
-      - "8081:8081"
-    environment:
-      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/drive
-      ME_CONFIG_BASICAUTH_ENABLED: "false"
-      ME_CONFIG_BASICAUTH: "false"
-      ME_CONFIG_BASICAUTH_USERNAME: ""
-      ME_CONFIG_BASICAUTH_PASSWORD: ""
-    depends_on:
-      mongo:
-        condition: service_healthy
+  redis:
+    image: redis:7.4-alpine
+    <<: *hardening
+    # noeviction: the job queue must never have entries evicted under memory pressure.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     restart: unless-stopped
-    networks:
-      - app-network
+    logging: *default-logging
+    networks: [app-network]
+
+  # S3-compatible object storage for file bytes. Swappable for S3/R2/GCS in
+  # other environments — only STORAGE_* configuration changes.
+  minio:
+    # Pinned, never `latest`. Note: MinIO cannot read a data directory written
+    # by a newer release, so only ever move this pin forward.
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    <<: *hardening
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-driveosx}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-driveosx-secret}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    logging: *default-logging
+    networks: [app-network]
 
 networks:
   app-network:
     driver: bridge
 
 volumes:
-  mongo-data:
+  postgres-data:
+  redis-data:
+  minio-data:

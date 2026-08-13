@@ -1,8 +1,0 @@
-.git
-.agents
-.codex
-node_modules
-**/node_modules
-**/.env
-**/dist
-npm-debug.log*

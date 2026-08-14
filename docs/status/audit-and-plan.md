@@ -24,8 +24,8 @@ UI rendering and user interaction are reasoned from source and are marked
 | CRITICAL | 6     | 6     | 0         |
 | HIGH     | 8     | 8     | 0         |
 | MEDIUM   | 8     | 2     | 6         |
-| LOW      | 4     | 0     | 4         |
-| **Total**| **26**| **16**| **10**    |
+| LOW      | 6     | 2     | 4         |
+| **Total**| **28**| **18**| **10**    |
 
 One CRITICAL (`TASK-020`) was found **by running the fixes**, not by reading
 the code — see below.
@@ -34,11 +34,14 @@ Remaining items are documented below with the reason each was deferred. None
 is a regression; all are pre-existing gaps recorded so they are not lost.
 
 **Later additions.** `TASK-025` and `TASK-026` were raised after the audit
-date, during shell work on window dragging and dock behaviour. They are
-recorded here so the numbering stays the single sequence the rest of the
-documentation cites. This table is recounted from the task list below rather
-than incremented by hand — it had drifted once already, understating the count
-by three.
+date, during shell work on window dragging and dock behaviour. `TASK-027` and
+`TASK-029` were raised, and fixed in the same change, on 2026-08-15 while
+verifying the Code Editor's new Prettier/ESLint integration (`TASK-028`, a
+feature note, not a defect — excluded from the counts above) via live browser
+automation. All are recorded here so the numbering stays the single sequence
+the rest of the documentation cites. This table is recounted from the task
+list below rather than incremented by hand — it had drifted once already,
+understating the count by three.
 
 ---
 
@@ -587,13 +590,18 @@ so *widening* the window squeezed the detail pane. Each pane measures itself.
 | `apps/mail-studio` | 13 |
 | `apps/settings` | 10 |
 | `apps/calculator` | 8 |
-| `apps/text-editor`, `apps/clock` | 7 each |
+| `apps/clock` | 7 |
 | `apps/launcher` | 6 |
 | `apps/pdf-viewer`, `apps/contacts` (its form modal only) | 4 each |
 | `apps/terminal` | 2 |
 | `apps/spreadsheet`, `apps/browser` | 1 each |
 
-Thirteen applications, ~154 occurrences. Not every one is a visible defect —
+`apps/text-editor` (7 occurrences at audit time) no longer exists — it was
+replaced outright by `apps/code-editor` on 2026-08-15, not renamed in place.
+The new app has none of this pattern (confirmed by re-grepping), so it's
+dropped from this table rather than carried forward as a stale reference.
+
+Twelve applications, ~147 occurrences. Not every one is a visible defect —
 a prefix on an element that never gets narrow is harmless — so this needs
 triage per application rather than a blanket replacement. Messenger and Mail
 Studio additionally carry their own inline `ResizeObserver` implementations
@@ -623,3 +631,65 @@ disable and a comment explaining why (see
 `typecheck` so `lint` means linting.
 
 The cheapest item in this document by ratio of cost to defect class prevented.
+
+**Not to be confused with TASK-028 below.** That adds ESLint as an in-app
+feature of the Code Editor — it lints files a *user* opens in that app, running
+entirely in the browser. It does not touch `npm run lint`, has no
+configuration file, and does nothing for this repository's own source. This
+task is still open.
+
+---
+
+## TASK-027 — Save As never updated a tab's detected language
+
+* **Priority**: `LOW`  **Status**: `FIXED`
+* **Module**: `drive-osx-ui` → `apps/code-editor`
+
+**Problem.** Saving an untitled tab under a new name (e.g. `Untitled-1` →
+`test.js`, Ctrl+Shift+S) updated the tab's `fileName` but not its `language`
+field, so Monaco kept rendering it as plain text — no syntax highlighting, and
+by extension nothing that keys off the detected language (Prettier, ESLint)
+ever activated either, silently.
+
+**Found by** Driving the new Prettier/ESLint integration (TASK-028) live via
+Playwright: a file saved as `.js` still reported the status bar language as
+"Plain Text" and produced zero lint diagnostics on code that should have
+several.
+
+**Fix.** `language: languageForFileName(created.name)` added alongside the
+other renamed-tab fields in the Save As branch of `handleSave`
+(`apps/code-editor/index.tsx`).
+
+---
+
+## TASK-028 — Code Editor: real in-browser Prettier and ESLint, and a VS Code-style Settings page
+
+* **Priority**: n/a (feature, not a defect)  **Status**: `DONE`
+
+Added this session, recorded here only because it's the origin of TASK-027 and
+TASK-029 above and below. Full description in
+[`docs/reference/applications.md`](../reference/applications.md#code-editor)
+— not duplicated here to avoid the two documents drifting apart.
+
+---
+
+## TASK-029 — Stale ESLint markers after the Settings tab closed
+
+* **Priority**: `LOW`  **Status**: `FIXED`
+* **Module**: `drive-osx-ui` → `apps/code-editor`
+
+**Problem.** Opening Settings unmounts the shared Monaco editor pane (it isn't
+rendered while Settings is showing); Monaco's underlying text models persist
+regardless, but nothing re-ran the lint pass when the pane remounted on
+return. Toggling "ESLint: Enable" off from within Settings and coming back to
+a file left its old warning markers on screen, status bar count included, even
+though the toggle itself had taken effect correctly in state.
+
+**Found by** The same Playwright pass as TASK-027 — disabling ESLint from the
+new Settings page and reopening the file tab, then checking the status bar
+count didn't drop to zero as expected.
+
+**Fix.** The lint pass is now also triggered directly from `onEditorMount`,
+which fires on every fresh mount of the shared editor (Settings-close
+included), rather than relying solely on the `activeTabId`-keyed effect.
+`apps/code-editor/index.tsx`.

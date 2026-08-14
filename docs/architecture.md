@@ -502,7 +502,7 @@ Which applications hold real, server-owned data, and which are local-only:
 | Contacts | API (`/contacts`) | Server-owned |
 | Trash | API (`/files/trash`), local cache | Server-owned |
 | Mail Studio | API (`/mail`) for messages | Messages server-owned; folders/rules local |
-| Text Editor | API (`/files`) | Server-owned |
+| Code Editor | API (`/files`) | Server-owned |
 | Meet | API (`/meetings`) + WebRTC | Server-owned |
 | Calendar | Browser only | Not persisted (TASK-009) |
 | Spreadsheet, Presentation, Paint | Browser only | Documents not yet stored in Drive |

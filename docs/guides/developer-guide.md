@@ -239,8 +239,13 @@ This matters more than it sounds, because most of this repository's
 documentation debt came from claiming completion.
 
 * Say what you **verified** and how. "Typecheck passes" is not "it works".
-* There is no browser automation here. **UI rendering and interaction cannot
-  be verified** — say so rather than implying otherwise.
+* Browser automation (Playwright) is not guaranteed to be available in every
+  session's environment. When it isn't, UI rendering and interaction cannot be
+  verified — say so rather than implying otherwise. When it **is** available,
+  use it: click, type, and screenshot rather than stopping at typecheck/build.
+  Either way, name the actual basis in the doc — see the Code Editor entry in
+  `docs/reference/applications.md` for what "verified live" looks like written
+  down next to entries that aren't.
 * If part of a task is blocked, finish everything else and state plainly what
   was left and why. Do not quietly reduce scope.
 * Use `UNKNOWN` or `BLOCKED` where that is the truth, and say what would

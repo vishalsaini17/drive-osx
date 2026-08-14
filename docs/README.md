@@ -70,10 +70,15 @@ is a record of a particular pass and should be read as history.
 * Filenames are lower-case and hyphenated. `ADR-*.md` is the one exception:
   decision records are numbered and their names are referenced elsewhere.
 * Every claim about whether something works carries its basis — `VERIFIED`,
-  `REVIEWED`, `UNKNOWN`, `BLOCKED`. There is **no browser automation in this
-  repository**, so no document may claim that a user interface works on any
-  stronger basis than typecheck, build, and the API calls the code makes. The
-  reasoning behind this rule is in
+  `REVIEWED`, `UNKNOWN`, `BLOCKED`. Browser automation (Playwright) is not
+  guaranteed to be available in every session's environment; when it isn't, no
+  document may claim that a user interface works on any stronger basis than
+  typecheck, build, and the API calls the code makes. When it *is* available
+  and was actually used, say so explicitly rather than quietly reusing a
+  stronger-sounding label the rest of the document hasn't earned — see the
+  Code Editor entry in
+  [reference/applications.md](reference/applications.md) for what that looks
+  like done. The reasoning behind this rule is in
   [guides/developer-guide.md](guides/developer-guide.md#reporting-honestly).
 * Documentation is updated in the same change as the code, not afterwards. The
   table of what to update for what is at the end of the developer guide.

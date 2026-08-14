@@ -20,7 +20,7 @@ directly from an application.**
 | ------ | ----------- | ------ | ------- | ---- | ---------------- | ------ |
 | Login/Register screens | `/register` `/login` | POST | Create session | None | Field-level errors from `details.fields` | `VERIFIED` |
 | `http.ts` interceptor | `/auth/refresh` | POST | Rotate expired access token | Refresh token | One retry, then `expired` session event → redirect to login | `REVIEWED` |
-| File Explorer, Text Editor | `/files/*` | REST | Drive CRUD, versions, trash | Bearer | Store rolls back and notifies on failure | `VERIFIED` |
+| File Explorer, Code Editor | `/files/*` | REST | Drive CRUD, versions, trash | Bearer | Store rolls back and notifies on failure | `VERIFIED` |
 | File Explorer | `/shares/*` | REST | Grants and links | Bearer | Error surfaced in share dialog | `REVIEWED` |
 | Trash app | `/files/trash`, `/files/:id/permanent` | GET/DELETE | Server-owned trash | Bearer | Partial failure keeps failed items listed and says how many | `VERIFIED` |
 | Messenger | `/messaging/*` | REST | Requests, conversations, messages | Bearer | Inline error banner + retry; offline worded separately | `VERIFIED` |
@@ -143,7 +143,7 @@ as well as Messenger) while working in production.
 | ------------- | ------------- | --- | ---------- | ------ |
 | Messenger | Contacts | `/contacts` (server) | Accepting a request creates both contact rows **in the acceptance transaction** | `VERIFIED` |
 | Messenger | Notification centre | `/notifications` | Request, acceptance and message notifications | `VERIFIED` |
-| File Explorer | Text Editor, PDF Viewer, Paint | `EditorRegistry` | Which app opens which MIME type | `REVIEWED` |
+| File Explorer | Code Editor, PDF Viewer, Paint | `EditorRegistry` | Which app opens which MIME type | `REVIEWED` |
 | File Explorer | Trash | Shell store + `/files/trash` | Trashed items | `VERIFIED` |
 | Any app | Window manager | `platform.windows` | Open, focus, close | `REVIEWED` |
 | Window manager | Dock | `shell/taskbar/dockZone.ts` | Which window is being dragged, and whether it covers the dock's strip. Published per frame during a gesture **instead of** writing geometry to the shell store — see [Windows and the dock](../features/shell-windows-and-dock.md) | `VERIFIED (TEST)` |

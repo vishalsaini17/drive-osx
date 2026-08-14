@@ -2,7 +2,9 @@
 
 Every application, module and service in the repository, with an **evidenced**
 status. Compiled 2026-08-13 from source review plus live probing of a running
-stack.
+stack; the Code Editor entry was rewritten 2026-08-15 after that app was
+rebuilt, and is the one entry additionally verified by live browser
+automation (see the note above the frontend table).
 
 ## How to read the status
 
@@ -14,10 +16,12 @@ stack.
 | `NOT_IMPLEMENTED` | Referenced somewhere but absent. |
 | `UNKNOWN` | Not verifiable in this environment — always says what is needed. |
 
-**Verification honesty.** There is no browser automation here, so no UI is
-marked `WORKING` on the strength of rendering. Frontend entries are verified at
-the layer that *was* checked — typecheck, production build, and the API calls
-they make — and say so.
+**Verification honesty.** Most frontend entries below were **not** exercised in
+a browser — they're verified at the layer that *was* checked (typecheck,
+production build, and the API calls the code makes), and say so. **Code
+Editor is the one exception:** it was driven live in a real browser via
+Playwright (clicks, typing, screenshots) and is marked accordingly. Don't
+infer the same basis for any other entry just because this one has it.
 
 ---
 
@@ -138,8 +142,9 @@ they make — and say so.
 # Part 2 — Frontend applications (`drive-osx-ui`)
 
 All entries below share: React 19 + TypeScript + Tailwind v4, Zustand for shell
-state, and `UNVERIFIED (UI rendering)` — typecheck and production build pass,
-but no browser exercised the interface.
+state. Unless otherwise noted, `UNVERIFIED (UI rendering)` — typecheck and
+production build pass, but no browser exercised the interface. Code Editor is
+the noted exception.
 
 ## File Explorer
 
@@ -189,10 +194,14 @@ but no browser exercised the interface.
 * **Known issues** No automated coverage of camera teardown, which has regressed before
 * **Risk** Medium
 
-## Text Editor
+## Code Editor
 
-* **Status** `WORKING` (documents persist via `/files`; UI unverified)
-* **Known issue** Still writes a `webos-files` localStorage mirror alongside the API
+* **Location** `src/apps/code-editor/` (3,206 lines) — replaced the old Text Editor app entirely, not a rename
+* **Uses** `platform.files` → `/files` (open, save, create/rename/delete/move, and a BFS workspace walk for Search); Monaco Editor, bundled locally with no CDN fetch (offline-first per `CLAUDE.md` §18); Prettier (`prettier/standalone` + real parser plugins) and ESLint (`eslint-linter-browserify`), both running client-side with no server round-trip
+* **Implemented** Open Folder with a real lazy-loaded tree; full Explorer create/rename/delete/move with drag-and-drop (same drag protocol as File Explorer, so files drag between the two); global workspace Search with case/whole-word/regex and Find & Replace, skipping files with unsaved local edits; an Activity Bar (Explorer, Search) plus a Settings entry point that opens a full VS Code-style Settings page — searchable, categorized (Commonly Used / Text Editor / Workbench / Extensions), every control bound to a real persisted preference; toggleable breadcrumbs; a status bar whose cursor position and problem counts come from Monaco's own marker service, not placeholders; real Prettier formatting (Format Document, Shift+Alt+F, and an optional Format On Save) for JS, TS, JSON, CSS, LESS, SCSS, HTML, Markdown, YAML and GraphQL; real ESLint linting of JavaScript/JSX as you type, using a curated core rule set
+* **Explicitly not implemented** A plugin marketplace or extension host. The Extensions page lists Prettier and ESLint as genuinely installed, and GitLens, Python, and Docker as "Recommended" — each with an honest, specific explanation of the backend it would need (Git integration, a language server, a container runtime) that doesn't exist on this platform. There is no Install button that does nothing.
+* **Status** `WORKING` — the one frontend entry in this document verified by **live browser automation** (Playwright), across this and an earlier pass: folder open, folder/nested-folder rename (Explorer and Code Editor stay in sync), drag-and-drop, workspace search and replace, the breadcrumb toggle, and — most recently — typing malformed JavaScript, saving as `.js`, watching real ESLint warnings appear, and Shift+Alt+F producing genuine Prettier-formatted output, each step screenshotted
+* **Known issue** TypeScript files aren't linted — ESLint's default parser (espree) can't read TypeScript syntax, so this is scoped to JS/JSX rather than silently producing wrong results on `.ts`/`.tsx`
 * **Risk** Low
 
 ## Calendar

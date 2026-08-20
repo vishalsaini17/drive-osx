@@ -67,7 +67,7 @@ drive-osx-api/src/
 │   ├── identity/              users, sessions, password recovery
 │   ├── organizations/         tenants, memberships, teams, storage quota
 │   ├── files/                 drive metadata, contents, versions, search
-│   ├── sharing/               user/team/link grants
+│   ├── sharing/               user/team/link grants, eligible-user search, per-file activity
 │   ├── mail/                  mailboxes, delivery
 │   ├── meetings/              meetings, participants, chat
 │   ├── notifications/         durable + realtime notifications
@@ -92,9 +92,20 @@ whether an actor may touch a resource.
 
 Roles: `owner`, `admin`, `manager`, `member`, `guest` for the workspace;
 `owner`, `editor`, `commenter`, `viewer` for individual resources. The strongest
-grant wins — ownership, workspace administration, direct share, team share.
-Missing access is reported as "not found" so the API does not confirm the
-existence of resources the caller cannot see.
+grant wins — ownership, workspace administration, a direct/team share on the
+file itself, or a share on one of its ancestor folders (`effectiveFileRole` in
+`access-control.ts` walks `parent_id` up to the root, so sharing a folder
+implicitly shares everything inside it). Missing access is reported as "not
+found" so the API does not confirm the existence of resources the caller
+cannot see.
+
+"Share with..." only offers people already in the sharer's contacts
+(`modules/contacts`) — the app's existing notion of a connection — rather than
+searching the full `users` table, via `GET /shares/files/:fileId/eligible-users`.
+Public links (`POST /shares/files/:fileId/links`) remain the one path that can
+reach outside the tenant, gated by the organization's sharing policy; a link is
+resolved anonymously at `GET /shares/links/:token` and opened in the UI at
+`/s/:token`.
 
 ### Every user starts alone in their own tenant
 

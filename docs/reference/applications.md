@@ -150,6 +150,8 @@ the noted exception.
 
 * **Location** `src/apps/file-explorer/` (2,295 lines)
 * **Uses** `platform.files` → `/files`, `/shares`
+* **Routing** `/folder` opens the root; `/folder/:folderId` opens that folder directly (`folderId` is the backend's real folder id, e.g. `/folder/abc123` — never a name). Reload or a direct link lands back in the same folder; browser Back/Forward walks through folders visited, each a separate history entry (`src/App.tsx`'s `DesktopLayout` sync effect + `AppRegistry.getPathForApp`/`getAppIdForPath`/`getFolderIdFromPath`, backed by `fileManagerCurrentFolderId` in `systemStore`). An id that doesn't resolve to an accessible folder shows an inline "Folder not found" state instead of silently falling back to root.
+* **Sharing** The Share dialog (`components/ShareModal.tsx`) is fully backed by the `/shares` API — "People with access" is loaded live, adding someone autocompletes against the sharer's contacts (`FileService.searchEligibleUsers`, debounced ~300ms), removing calls `revokeShare`, and the public-link tab creates/rotates a real token (opened at `/s/:token`, `shell/auth/ShareLinkPage.tsx`). A shared file/folder shows a small people-icon badge in the grid and list views (`item.isShared`), and "Shared with me" in the sidebar is a real `FileService.listSharedWithMe()` view rather than fixture data. Toolbar/context-menu actions are additionally hidden per `item.effectiveRole` as a UX hint — the `/files` and `/shares` APIs enforce the real rule server-side regardless.
 * **Implemented** Browse, upload, download, rename, move, trash, restore, share, properties, preview, open-with, multi-select, context menus
 * **Status** `WORKING` (data path verified via API; UI unverified)
 * **Risk** Low

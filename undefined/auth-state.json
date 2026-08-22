@@ -1,0 +1,38 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "dock-pinned-apps",
+          "value": "[\"browser\",\"terminal\",\"fileManager\",\"settings\",\"messenger\",\"clock\",\"editor\",\"paint\",\"calendar\",\"meeting\",\"trash\",\"mail\",\"calculator\",\"spreadsheet\",\"presentation\",\"pdf-viewer\",\"contacts\",\"wordbook\"]"
+        },
+        {
+          "name": "webos-refresh-token",
+          "value": "cLYf9BVENs2adagz3OLNBw2yCiiVeQbJxTXQb69nXDsjMiJpyBHz8A4H818kUj2e"
+        },
+        {
+          "name": "webos-files",
+          "value": "[{\"id\":\"76048166-7609-4bee-8f45-0eec8e1fb0a9\",\"name\":\"Documents\",\"type\":\"folder\",\"content\":\"\",\"parentId\":null,\"createdAt\":\"2026-08-22T06:55:15.134Z\",\"updatedAt\":\"2026-08-22T06:55:15.134Z\",\"size\":0,\"starred\":false,\"category\":\"folder\",\"originalParentId\":null,\"isShared\":false,\"effectiveRole\":\"owner\",\"isSystem\":true},{\"id\":\"2f17b1f5-587c-4728-bcce-660afa2c79b7\",\"name\":\"Music\",\"type\":\"folder\",\"content\":\"\",\"parentId\":null,\"createdAt\":\"2026-08-22T06:55:15.134Z\",\"updatedAt\":\"2026-08-22T06:55:15.134Z\",\"size\":0,\"starred\":false,\"category\":\"folder\",\"originalParentId\":null,\"isShared\":false,\"effectiveRole\":\"owner\",\"isSystem\":true},{\"id\":\"0eae4ecd-52fb-4a72-8427-91113d20e2c9\",\"name\":\"Pictures\",\"type\":\"folder\",\"content\":\"\",\"parentId\":null,\"createdAt\":\"2026-08-22T06:55:15.134Z\",\"updatedAt\":\"2026-08-22T06:55:15.134Z\",\"size\":0,\"starred\":false,\"category\":\"folder\",\"originalParentId\":null,\"isShared\":false,\"effectiveRole\":\"owner\",\"isSystem\":true},{\"id\":\"b5b5c353-6ed1-47a6-9d57-6133b5e8d100\",\"name\":\"Videos\",\"type\":\"folder\",\"content\":\"\",\"parentId\":null,\"createdAt\":\"2026-08-22T06:55:15.134Z\",\"updatedAt\":\"2026-08-22T06:55:15.134Z\",\"size\":0,\"starred\":false,\"category\":\"folder\",\"originalParentId\":null,\"isShared\":false,\"effectiveRole\":\"owner\",\"isSystem\":true},{\"id\":\"09ca718e-667c-465e-9e73-1c04d4684b21\",\"name\":\"TestNote.txt\",\"type\":\"file\",\"content\":\"\",\"parentId\":null,\"createdAt\":\"2026-08-22T06:58:08.342Z\",\"updatedAt\":\"2026-08-22T06:58:08.695Z\",\"size\":38,\"starred\":false,\"category\":\"text\",\"originalParentId\":null,\"isShared\":false,\"effectiveRole\":\"owner\",\"isSystem\":false}]"
+        },
+        {
+          "name": "webos-current-user",
+          "value": "{\"username\":\"claudetest81714180\",\"fullName\":\"Claude Test\",\"passwordHash\":\"TestPass123!\",\"avatarUrl\":\"👾\",\"email\":\"claudetest81714180@driveosx.com\",\"recoveryEmail\":\"claudetest81714180@example.com\",\"mobile\":null}"
+        },
+        {
+          "name": "webos-calendar-events",
+          "value": "[{\"id\":\"evt-1\",\"title\":\"Team Sync & Project Review\",\"date\":\"2026-08-22\",\"time\":\"10:00 AM\",\"endTime\":\"11:00 AM\",\"category\":\"Work\",\"description\":\"Review system design & upcoming sprints with team leads.\",\"location\":\"OSX Meet Virtual Room\",\"attendees\":[{\"email\":\"alex@driveosx.com\",\"name\":\"Alex Johnson\",\"status\":\"accepted\"},{\"email\":\"sarah@driveosx.com\",\"name\":\"Sarah Miller\",\"status\":\"pending\"},{\"email\":\"dev@driveosx.com\",\"name\":\"Dev Team\",\"status\":\"accepted\"}],\"meetingLink\":\"https://meet.driveosx.com/room-teamsync\",\"recurrence\":\"weekly\",\"reminder\":\"15m\",\"timezone\":\"America/New_York\"},{\"id\":\"evt-2\",\"title\":\"Lunch with Alex\",\"date\":\"2026-08-22\",\"time\":\"01:00 PM\",\"endTime\":\"02:00 PM\",\"category\":\"Personal\",\"description\":\"Bistro Cafe on 5th Avenue\",\"location\":\"Bistro Cafe\",\"attendees\":[{\"email\":\"alex@driveosx.com\",\"name\":\"Alex Johnson\",\"status\":\"accepted\"}],\"recurrence\":\"none\",\"reminder\":\"30m\",\"timezone\":\"America/New_York\"},{\"id\":\"evt-3\",\"title\":\"Weekly Sprint Planning\",\"date\":\"2026-08-22\",\"time\":\"03:00 PM\",\"endTime\":\"04:00 PM\",\"category\":\"Work\",\"description\":\"Backlog refinement and task allocation.\",\"location\":\"HQ Conference Room A\",\"attendees\":[{\"email\":\"pm@driveosx.com\",\"name\":\"Product Manager\",\"status\":\"accepted\"}],\"meetingLink\":\"https://meet.driveosx.com/room-sprintplan\",\"recurrence\":\"weekly\",\"reminder\":\"1h\",\"timezone\":\"UTC\"}]"
+        },
+        {
+          "name": "webos-organization-id",
+          "value": "276423e0-a92d-4cee-ba6f-6fb053d0bab2"
+        },
+        {
+          "name": "webos-jwt-token",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjIzZGVjOThhLWI2ZGItNGNkMy1hMTFlLTM1YjlmZTQ0OTM0MSIsInN1YiI6IjIzZGVjOThhLWI2ZGItNGNkMy1hMTFlLTM1YjlmZTQ0OTM0MSIsInVzZXJuYW1lIjoiY2xhdWRldGVzdDgxNzE0MTgwIiwib3JnYW5pemF0aW9uSWQiOiIyNzY0MjNlMC1hOTJkLTRjZWUtYmE2Zi02ZmIwNTNkMGJhYjIiLCJzZXNzaW9uSWQiOiIyOTgxZjU1My03YmQ3LTQyNjMtYWMxNC1mOGExNzRkMTk3OWYiLCJpYXQiOjE3ODczOTUwMDIsImV4cCI6MTc4NzM5ODYwMn0.pbUsKyuLLUOkEdrLQT0YKVYuhTwOU8-hkyeFwkwdPE4"
+        }
+      ]
+    }
+  ]
+}

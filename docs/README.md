@@ -18,7 +18,8 @@ docs/
 │   └── testing.md           How to verify a change, and where coverage is missing
 ├── reference/
 │   ├── applications.md      Every application and its real status
-│   └── integration-map.md   What talks to what, and what breaks if you change it
+│   ├── integration-map.md   What talks to what, and what breaks if you change it
+│   └── database-schema.md   Every table, its purpose, and its constraints
 ├── features/                One document per feature, end to end
 └── status/                  Point-in-time audits and verification reports
 ```
@@ -39,6 +40,7 @@ Two documents live outside this folder on purpose:
 | To change code safely | [guides/developer-guide.md](guides/developer-guide.md) |
 | To know whether an application actually works | [reference/applications.md](reference/applications.md) |
 | To know what your change breaks downstream | [reference/integration-map.md](reference/integration-map.md) |
+| To know the tables, columns, and constraints | [reference/database-schema.md](reference/database-schema.md) |
 | To verify a change | [guides/testing.md](guides/testing.md) |
 | To know why something was done this way | [architecture/decisions/](architecture/decisions/) |
 | To follow one feature end to end | [features/](features/) |

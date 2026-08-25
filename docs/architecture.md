@@ -355,8 +355,9 @@ before light wallpapers existed those labels were hardcoded white.
 
 `resolveAppTheme` and `resolveWindowTheme` are pure and live in
 `platform/theme/appTheme.ts`; `useAppTheme(appId)` is the React binding and is
-the only thing an application should call. Every window's menu carries the four
-choices, and Preferences → Applications lists them for every installed app.
+the only thing an application should call. Every window's menu carries a
+**Preferences…** item (`Ctrl+,`) opening `AppSettingsModal`, which lists the
+four theme choices for that app alongside its other settings (see below).
 Because everything is derived from store state and a live `matchMedia`
 subscription, changing the global theme re-themes open windows immediately.
 
@@ -383,6 +384,36 @@ mapped onto `'theme'`, which is the same behaviour under the new name, then the
 old key is dropped so one setting is never described twice. Shell surfaces —
 the dock popups, context menus, notification centre — follow the global theme
 directly; they are not windows and have no per-app preference.
+
+### Preferences and app settings
+
+Until 2026-08-24 every app's window menu opened the same shared
+`PreferencesDialog` (Appearance / Windows / Applications / System sections),
+reading and writing a mix of per-app and global fields from one component.
+That dialog is deleted. In its place:
+
+* **Per-app settings** live in `state.settings.appPreferences[appId]`,
+  mutated only through `updateAppPreference(appId, key, value)` /
+  `resetAppPreferences(appId)`, and surfaced through `AppSettingsModal` — one
+  instance per app, opened from that app's own window menu. This covers the
+  per-app theme choice above, a per-app default window size, and whatever
+  fields that app's manifest declares in `settingsSchema`.
+* **Platform-wide settings** — default window open mode, default size,
+  default placement, remember-window-layout, show-menu-button,
+  focus-follows-mouse, confirm-before-closing, reduce-motion, interface
+  sounds — moved into the Settings app itself, under Desktop → **Window
+  management**. They are no longer reachable from a per-app menu at all.
+* **Precedence**, new and now explicit: a per-app window-size preference
+  wins over the platform-wide custom size, which wins over the app
+  manifest's built-in default.
+* Code Editor is the one app excluded from `AppSettingsModal` — it already
+  has a hand-built, VS Code-style Settings page and keeps it rather than
+  gaining a second, smaller settings surface.
+
+This is the concrete instance of the server-state/UI-state split this
+document expects elsewhere (see §6 of `CLAUDE.md`): platform-wide UI state
+belongs to the Settings app, and every app-specific setting is namespaced
+under that app's own key rather than flattened into one global shape.
 
 ## Errors
 

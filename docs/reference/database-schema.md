@@ -30,6 +30,13 @@ below store metadata and references only.
 | `0003_collaboration_and_platform.sql` | Mail, meetings, notifications, audit log, domain-event outbox |
 | `0004_messaging_and_contacts.sql` | Chat requests, conversations, messages, contacts, presence |
 | `0005_contact_detail_fields.sql` | Adds address/website/birthday/department/team/labels to `contacts` |
+| `0006_contact_panel_actions.sql` | `contacts.is_blocked`; `conversation_participants.deleted_at` (delete-for-me) |
+| `0007_chat_history_clears_on_delete.sql` | `conversation_participants.history_cleared_at` — a permanent per-participant cutoff, since `deleted_at` alone resurrected the full history on a new message |
+| `0008_message_delivery_status.sql` | `conversation_participants.last_delivered_at` — derives sent/delivered/read status without a per-message column |
+| `0009_group_conversation_features.sql` | `conversation_participants.is_favourite` — favouriting generalized from contacts to any conversation |
+| `0010_group_admin_controls.sql` | `conversations.avatar_url` (string, not an upload) — gates on the existing `role` column, no new column needed for admin checks |
+| `0011_message_pins.sql` | `messages.pinned_at` + partial index — activates `reactions`/`reply_to_id` from `0004` with no further schema change |
+| `0012_message_forward_and_delete_modes.sql` | `messages.forwarded`; `messages.deleted_for uuid[]` (delete-for-me at message granularity, distinct from `deleted_at` = delete-for-everyone) |
 
 ## Conventions used throughout
 
@@ -97,21 +104,26 @@ there is no `shares` row per descendant.
 | `audit_logs` | **Append-only** security/audit trail — actor, action, resource, metadata, request context. Never updated or deleted by application code. | Indexed by org, by resource, and by actor, each with `created_at DESC` |
 | `domain_events` | Transactional outbox (CLAUDE.md §24): a domain event row is committed **in the same transaction** as the state change that caused it, then dispatched by the worker. `claimed_at`/`processed_at`/`attempts` track delivery. | Partial index on unprocessed rows |
 
-## 4. Messaging and contacts (`0004`, `0005`)
+## 4. Messaging and contacts (`0004`–`0012`)
 
 Direct messaging is gated: two users can't exchange messages until a
 `chat_requests` row is accepted, which creates the conversation and the
 reciprocal `contacts` rows in one transaction — the three tables are designed
-to always agree, not synced after the fact.
+to always agree, not synced after the fact. `0006`–`0012` (2026-08-21–24)
+added group conversations, blocking, per-participant delete/clear, delivery
+status, pins, forwarding, and delete-for-me/delete-for-everyone, entirely as
+new columns on these same five tables — no new tables were needed. See
+[Messaging and contacts](../features/messaging-and-contacts.md) for the
+service-layer behaviour these columns back.
 
 | Table | Purpose | Notable constraints |
 | ----- | ------- | -------------------- |
 | `chat_requests` | Pending/accepted/rejected/cancelled introduction between two users. | `CHECK` forbids self-request; unique **pending** request per unordered pair (`least`/`greatest` of the two ids) |
-| `conversations` | A DM (`kind = 'direct'`) or group chat. `last_message_at`/`last_message_preview` are denormalized for list ordering without touching `messages`. | — |
-| `conversation_participants` | Membership, per-participant `is_muted`/`is_pinned`/`last_read_at` (drives unread counts). | Composite PK `(conversation_id, user_id)` |
+| `conversations` | A DM (`kind = 'direct'`) or group chat. `last_message_at`/`last_message_preview` are denormalized for list ordering without touching `messages`. `topic` (since `0004`, unused until `0009`) holds a group's description. `avatar_url` (`0010`) is a plain string — emoji or `http…` URL — following the same convention as `users.avatar_url`, not an object-storage upload. | — |
+| `conversation_participants` | Membership; per-participant `is_muted`/`is_pinned`/`last_read_at` (drives unread counts); `role` (owner/admin/member) gates group admin actions. `deleted_at` (`0006`) hides a conversation for one participant and clears itself on the next new message; `history_cleared_at` (`0007`) is a *permanent* per-participant cutoff that does not clear, added after `deleted_at` alone was found to resurrect the full history on revival. `last_delivered_at` (`0008`) is the delivery half of the read-receipt watermark, alongside `last_read_at`. `is_favourite` (`0009`) generalizes favouriting from `contacts` to any conversation, since a group has no single contact row to favourite. | Composite PK `(conversation_id, user_id)` |
 | `direct_conversation_keys` | Enforces **one** direct conversation per user pair via a generated, order-independent pair key. | `CHECK (user_a_id < user_b_id)` + unique index on the ordered pair |
-| `messages` | Chat messages. Supports threads (`thread_parent_id`) and quote-replies (`reply_to_id`) as two different relationships; `reactions`/`mentions` are inline JSON/array rather than join tables since they're small and always read with the message. | Soft-deleted via `deleted_at` |
-| `contacts` | A user's address book. `contact_user_id` links to a real platform account when the contact is one (e.g. created via an accepted chat request); external-only contacts leave it null. `source` explains provenance in the UI. `0005` added `address/website/birthday/department/team/labels`. | `CHECK` forbids self-contact; unique `(owner_id, contact_user_id)` when linked to a real account |
+| `messages` | Chat messages. Supports threads (`thread_parent_id`) and quote-replies (`reply_to_id`) as two different relationships; `reactions`/`mentions` are inline JSON/array rather than join tables since they're small and always read with the message — `reactions`/`reply_to_id` existed unused since `0004` until service-layer support landed in `0011`/`223145b`. `pinned_at` (`0011`) pins the message itself, distinct from `conversation_participants.is_pinned` which pins a whole chat in one participant's list. `forwarded` (`0012`) flags a message created by `forwardMessage`. `deleted_for uuid[]` (`0012`) is a per-viewer hide list for "delete for me," distinct from `deleted_at` which now specifically means "deleted for everyone" (sender-only, tombstones the row for all participants). | Soft-deleted via `deleted_at`; `messages_pinned_idx` partial index on `pinned_at IS NOT NULL` |
+| `contacts` | A user's address book. `contact_user_id` links to a real platform account when the contact is one (e.g. created via an accepted chat request); external-only contacts leave it null. `source` explains provenance in the UI. `0005` added `address/website/birthday/department/team/labels`. `is_blocked` (`0006`) blocks new requests and direct messages both ways — not enforced in group chats or directory search. | `CHECK` forbids self-contact; unique `(owner_id, contact_user_id)` when linked to a real account |
 | `user_presence` | Durable "last seen" projection. The **live** heartbeat lives in Redis (CLAUDE.md §12); this row is the rebuildable snapshot that survives a restart. | PK is `user_id` |
 
 ## Entity relationships

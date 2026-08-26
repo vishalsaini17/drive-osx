@@ -34,6 +34,27 @@ services:
         condition: service_healthy
     restart: on-failure
 
+  # Dev convenience only: the app itself is https-only (vite.config.ts's dev
+  # TLS cert), but a browser given a bare host with no scheme/port — e.g.
+  # someone typing just the LAN IP out of habit — defaults to plain http on
+  # port 80. Without this, that lands nowhere; with it, they land on the
+  # https app instead of a confusing dead end. Production is unaffected —
+  # nginx there already owns port 80 directly.
+  drive-osx-ui-redirect:
+    image: node:24.13-alpine
+    volumes:
+      - type: bind
+        source: ./drive-osx-ui/scripts/dev-https-redirect.js
+        target: /dev-https-redirect.js
+        read_only: true
+    command: node /dev-https-redirect.js
+    environment:
+      PORT: 80
+      TARGET_HTTPS_PORT: ${UI_DEV_PORT:-3000}
+    ports:
+      - "${UI_DEV_REDIRECT_PORT:-80}:80"
+    restart: unless-stopped
+
   drive-osx-api:
     image: drive-osx/api:dev
     build:

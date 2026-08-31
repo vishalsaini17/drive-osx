@@ -61,6 +61,8 @@ services:
       STORAGE_BUCKET: ${STORAGE_BUCKET:-drive-osx}
       # Signed URLs are redeemed by the browser, not by the API container.
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-http://localhost:9000}
+      # Outbound mail hand-off — see drive-osx-mail's relay port below.
+      MAIL_GATEWAY_URL: http://drive-osx-mail:2526
     ports:
       - "${API_PORT:-7000}:7000"
     depends_on:
@@ -95,6 +97,8 @@ services:
       STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-driveosx-secret}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-drive-osx}
       WORKER_HEALTH_PORT: 7001
+      # The mail.deliver job handler calls out to drive-osx-mail's relay port.
+      MAIL_GATEWAY_URL: http://drive-osx-mail:2526
     # The worker talks to the datastores directly; it does not need the API.
     depends_on:
       postgres:
@@ -126,8 +130,21 @@ services:
       PORT: 2525
       HOST: 0.0.0.0
       API_BASE_URL: http://drive-osx-api:7000
+    volumes:
+      # DKIM private key — see drive-osx-mail/scripts/generate-dkim-key.sh.
+      # Read-only; the container never needs to write to it.
+      - ./drive-osx-mail/secrets:/app/secrets:ro
+      # STARTTLS certificate (e.g. copied from Let's Encrypt). Read-only.
+      - ./drive-osx-mail/tls:/app/tls:ro
     ports:
-      - "${SMTP_PORT:-1025}:2525"
+      # 25 is not a convention — receiving mail servers only ever connect to
+      # port 25 for server-to-server SMTP, so this is the one port number
+      # here that isn't actually configurable at the protocol level. Override
+      # via SMTP_PORT only if something upstream (a load balancer, a cloud
+      # provider's port-25 block) already remaps it for you.
+      - "${SMTP_PORT:-25}:2525"
+      # The relay port (POST /deliver) is deliberately not published here —
+      # it's only reachable from drive-osx-api inside the compose network.
     depends_on:
       drive-osx-api:
         condition: service_healthy

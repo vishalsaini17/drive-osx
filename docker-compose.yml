@@ -162,7 +162,10 @@ services:
       # Fail the build of the cluster rather than silently allowing trust auth.
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # Bind-mounted (not a named volume) so the data lives in a folder you
+      # can see, back up, and rsync — and so `docker volume rm` /
+      # `docker compose down -v` can never touch it by accident.
+      - ./data/postgres:/var/lib/postgresql/data:z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-drive} -d ${POSTGRES_DB:-drive}"]
       interval: 5s
@@ -179,7 +182,7 @@ services:
     # noeviction: the job queue must never have entries evicted under memory pressure.
     command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     volumes:
-      - redis-data:/data
+      - ./data/redis:/data:z
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -204,7 +207,7 @@ services:
       - "${MINIO_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
-      - minio-data:/data
+      - ./data/minio:/data:z
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -218,8 +221,3 @@ services:
 networks:
   app-network:
     driver: bridge
-
-volumes:
-  postgres-data:
-  redis-data:
-  minio-data:

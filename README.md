@@ -296,11 +296,15 @@ If deliveries start returning `401`, the token differs between
   the failing probe output. Health checks live in the images, so they apply to
   `docker run` too.
 - **MinIO exits with `Unknown xl meta version`.** The pinned MinIO release is
-  older than the one that wrote `minio-data`. MinIO cannot downgrade a data
-  directory — move the pin in `docker-compose.yml` forward, or delete the
-  volume to start fresh.
-- **Start from a clean slate.** `docker compose down -v` deletes the database,
-  Redis and object storage volumes; the next start recreates the schema.
+  older than the one that wrote `./data/minio`. MinIO cannot downgrade a data
+  directory — move the pin in `docker-compose.yml` forward, or delete that
+  folder to start fresh.
+- **Start from a clean slate.** Postgres, Redis and MinIO data are bind-mounted
+  to `./data/postgres`, `./data/redis` and `./data/minio` — `docker compose
+  down -v` does **not** touch them (there are no named volumes left to remove).
+  To actually wipe state, stop the stack and remove those folders yourself,
+  e.g. `docker compose down && rm -rf ./data/postgres/* ./data/redis/*
+  ./data/minio/*`; the next start recreates the schema.
 - **Switched `COMPOSE_FILE` and a service fails to start.** The other mode's
   image has not been built yet. Run `docker compose up -d --build`.
 - **A setting seems to be ignored.** Check that your `.env` files still match
@@ -319,12 +323,17 @@ If deliveries start returning `401`, the token differs between
 
 - PostgreSQL holds users, organizations, memberships, teams, file metadata,
   permissions, shares, mail, meetings, notifications, audit logs and the
-  domain-event outbox. Volume: `postgres-data`.
+  domain-event outbox. Bind-mounted to `./data/postgres`.
 - Object storage holds file contents, versions and previews under
   `originals/`, `versions/`, `previews/` and `thumbnails/`, each prefixed by
-  organization. Volume: `minio-data`.
+  organization. Bind-mounted to `./data/minio`.
 - Redis holds cache entries, the job queue and realtime fan-out. Everything in
-  Redis is rebuildable from PostgreSQL. Volume: `redis-data`.
+  Redis is rebuildable from PostgreSQL. Bind-mounted to `./data/redis`.
+
+All three live under `./data/` on the host (see `.gitignore`) rather than in
+Docker-managed named volumes, specifically so an accidental `docker volume rm`
+or `docker compose down -v` cannot destroy them — the data is a visible,
+backupable folder in the project directory instead.
 
 Schema changes are forward-only SQL files in
 `drive-osx-api/src/infrastructure/database/migrations`. Applied migrations are

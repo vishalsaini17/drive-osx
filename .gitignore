@@ -11,3 +11,11 @@ drive-osx-ui/
 !.env.example
 .kilo
 .continue
+
+# Bind-mounted Postgres/Redis/MinIO data (docker-compose.yml). Real user data —
+# never commit it. Ignored as a whole directory (not data/*) so git never
+# needs to descend into data/postgres, which Postgres locks to mode 700 owned
+# by uid 999 — the host user can't even list it, let alone stat a .gitkeep
+# inside it. `docker compose up` creates missing bind-mount folders itself,
+# so no placeholder is needed for a fresh checkout.
+data/

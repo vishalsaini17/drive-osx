@@ -1,0 +1,28 @@
+{
+	email postmaster@driveosx.com
+}
+
+driveosx.com, www.driveosx.com {
+	reverse_proxy drive-osx-ui:8080
+}
+
+# MinIO's own port is not published publicly (docker-compose.proxy.yml) — the
+# API hands out presigned URLs against STORAGE_PUBLIC_URL, and the browser
+# redeems them here instead of a raw :9000.
+storage.driveosx.com {
+	reverse_proxy minio:9000
+}
+
+# SMTP isn't HTTP, so Caddy can't front drive-osx-mail's STARTTLS the way it
+# fronts the UI. This block exists only so certbot can complete the ACME
+# HTTP-01 challenge for mail.driveosx.com without ever needing to stop Caddy
+# — see scripts/issue-mail-cert.sh and scripts/renew-mail-cert.sh.
+mail.driveosx.com {
+	handle /.well-known/acme-challenge/* {
+		root * /var/www/certbot
+		file_server
+	}
+	handle {
+		respond "mail.driveosx.com serves SMTP, not HTTP" 404
+	}
+}

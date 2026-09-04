@@ -19,3 +19,9 @@ drive-osx-ui/
 # inside it. `docker compose up` creates missing bind-mount folders itself,
 # so no placeholder is needed for a fresh checkout.
 data/
+
+# certbot's account key and issued certs/keys for mail.driveosx.com
+# (docker-compose.proxy.yml, scripts/issue-mail-cert.sh). Real private key
+# material — generate fresh per host, never commit or copy between hosts.
+certbot-etc/
+certbot-webroot/

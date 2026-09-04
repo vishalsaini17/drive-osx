@@ -23,7 +23,7 @@ services:
   drive-osx-ui:
     # Mode-tagged image: switching COMPOSE_FILE can never silently reuse the
     # development artefact, and a missing tag triggers a build automatically.
-    image: drive-osx/ui:prod
+    image: vishalsaini17/driveosx:ui-prod
     build:
       context: ./drive-osx-ui
       target: production
@@ -43,7 +43,7 @@ services:
     networks: [app-network]
 
   drive-osx-api:
-    image: drive-osx/api:prod
+    image: vishalsaini17/driveosx:api-prod
     build:
       context: ./drive-osx-api
       target: production
@@ -80,7 +80,7 @@ services:
   # never blocks an API request, and so it can be scaled independently.
   drive-osx-worker:
     # Same image as the API; only the command differs.
-    image: drive-osx/api:prod
+    image: vishalsaini17/driveosx:api-prod
     build:
       context: ./drive-osx-api
       target: production
@@ -118,7 +118,7 @@ services:
     networks: [app-network]
 
   drive-osx-mail:
-    image: drive-osx/mail:prod
+    image: vishalsaini17/driveosx:mail-prod
     build:
       context: ./drive-osx-mail
       target: production

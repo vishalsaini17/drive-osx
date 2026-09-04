@@ -34,6 +34,27 @@ services:
         condition: service_healthy
     restart: on-failure
 
+  # Dev convenience only: the app itself is https-only (vite.config.ts's dev
+  # TLS cert), but a browser given a bare host with no scheme/port — e.g.
+  # someone typing just the LAN IP out of habit — defaults to plain http on
+  # port 80. Without this, that lands nowhere; with it, they land on the
+  # https app instead of a confusing dead end. Production is unaffected —
+  # nginx there already owns port 80 directly.
+  drive-osx-ui-redirect:
+    image: node:24.13-alpine
+    volumes:
+      - type: bind
+        source: ./drive-osx-ui/scripts/dev-https-redirect.js
+        target: /dev-https-redirect.js
+        read_only: true
+    command: node /dev-https-redirect.js
+    environment:
+      PORT: 80
+      TARGET_HTTPS_PORT: ${UI_DEV_PORT:-3000}
+    ports:
+      - "${UI_DEV_REDIRECT_PORT:-80}:80"
+    restart: unless-stopped
+
   drive-osx-api:
     image: drive-osx/api:dev
     build:
@@ -94,6 +115,12 @@ services:
       PORT: 2525
       HOST: 0.0.0.0
       API_BASE_URL: http://drive-osx-api:7000
+      # Real port-25 delivery does not work from a dev machine (blocked
+      # outbound, no reverse DNS, no sending reputation) — send everything to
+      # Mailpit's catch-all inbox instead. Unset in production, where real MX
+      # lookups are required (see docker-compose.yml).
+      SMTP_RELAY_HOST: mailpit
+      SMTP_RELAY_PORT: 1025
     volumes:
       - type: bind
         source: ./drive-osx-mail
@@ -103,7 +130,20 @@ services:
           selinux: z
       - /app/node_modules
     command: npm run dev
+    depends_on:
+      mailpit:
+        condition: service_started
     restart: on-failure
+
+  # Catches every outbound message so delivery can be tested end-to-end
+  # without a real domain, MX records, or port 25 access. Web UI on 8025.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1026}:1025"
+      - "${MAILPIT_WEB_PORT:-8025}:8025"
+    restart: unless-stopped
+    networks: [app-network]
 
   # Datastore ports are published in development so services can also be run
   # directly on the host against this infrastructure.

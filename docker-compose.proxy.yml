@@ -27,13 +27,13 @@
 # to confirm ui/api/minio show no ports before deploying.
 services:
   drive-osx-ui:
-    ports: []
+    ports: !override []
 
   drive-osx-api:
-    ports: []
+    ports: !override []
 
   minio:
-    ports: []
+    ports: !override []
 
   caddy:
     image: caddy:2.8-alpine

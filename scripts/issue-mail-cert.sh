@@ -30,9 +30,22 @@ docker run --rm \
     --non-interactive
 
 mkdir -p drive-osx-mail/tls
-cp "certbot-etc/live/$MAIL_HOST/fullchain.pem" drive-osx-mail/tls/fullchain.pem
-cp "certbot-etc/live/$MAIL_HOST/privkey.pem" drive-osx-mail/tls/privkey.pem
-chmod 644 drive-osx-mail/tls/fullchain.pem drive-osx-mail/tls/privkey.pem
+
+# certbot's container writes /etc/letsencrypt/live/<host> as root, mode 700
+# (it protects the private key regardless of what we'd prefer) — a plain
+# host-side `cp` as this script's own user can't even read into it. Do the
+# copy inside a throwaway root container instead, writing out with our uid,
+# so this never needs sudo (renew-mail-cert.sh runs this same way, unattended
+# from cron, where a sudo password prompt would just hang forever).
+docker run --rm \
+  -v "$(pwd)/certbot-etc:/etc/letsencrypt:ro" \
+  -v "$(pwd)/drive-osx-mail/tls:/out" \
+  alpine sh -c "
+    cp /etc/letsencrypt/live/$MAIL_HOST/fullchain.pem /out/fullchain.pem &&
+    cp /etc/letsencrypt/live/$MAIL_HOST/privkey.pem /out/privkey.pem &&
+    chown $(id -u):$(id -g) /out/fullchain.pem /out/privkey.pem &&
+    chmod 644 /out/fullchain.pem /out/privkey.pem
+  "
 
 echo
 echo "Certificate installed at drive-osx-mail/tls/. Restart the mail service to pick it up:"

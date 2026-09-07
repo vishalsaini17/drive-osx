@@ -17,10 +17,28 @@ docker run --rm \
   -v "$(pwd)/certbot-etc:/etc/letsencrypt" \
   certbot/certbot renew --webroot -w /var/www/certbot --quiet
 
-if [ "certbot-etc/live/$MAIL_HOST/fullchain.pem" -nt "drive-osx-mail/tls/fullchain.pem" ]; then
-  cp "certbot-etc/live/$MAIL_HOST/fullchain.pem" drive-osx-mail/tls/fullchain.pem
-  cp "certbot-etc/live/$MAIL_HOST/privkey.pem" drive-osx-mail/tls/privkey.pem
-  chmod 644 drive-osx-mail/tls/fullchain.pem drive-osx-mail/tls/privkey.pem
+BEFORE=""
+if [ -f drive-osx-mail/tls/fullchain.pem ]; then
+  BEFORE=$(sha256sum drive-osx-mail/tls/fullchain.pem | cut -d' ' -f1)
+fi
+
+# certbot's live/<host> dir is root-owned, mode 700 (protects the private
+# key) — this script's own user can't read into it, let alone compare
+# mtimes on it, so the copy has to happen inside a root container, same as
+# issue-mail-cert.sh.
+docker run --rm \
+  -v "$(pwd)/certbot-etc:/etc/letsencrypt:ro" \
+  -v "$(pwd)/drive-osx-mail/tls:/out" \
+  alpine sh -c "
+    cp /etc/letsencrypt/live/$MAIL_HOST/fullchain.pem /out/fullchain.pem &&
+    cp /etc/letsencrypt/live/$MAIL_HOST/privkey.pem /out/privkey.pem &&
+    chown $(id -u):$(id -g) /out/fullchain.pem /out/privkey.pem &&
+    chmod 644 /out/fullchain.pem /out/privkey.pem
+  "
+
+AFTER=$(sha256sum drive-osx-mail/tls/fullchain.pem | cut -d' ' -f1)
+
+if [ "$BEFORE" != "$AFTER" ]; then
   docker compose restart drive-osx-mail
   echo "$(date -Is): renewed and restarted drive-osx-mail"
 fi

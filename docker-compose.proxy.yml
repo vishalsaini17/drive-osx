@@ -1,0 +1,72 @@
+# TLS-terminating reverse proxy for a real-domain production deployment.
+#
+# Selected by COMPOSE_FILE in .env:
+#   COMPOSE_FILE=docker-compose.yml                            → bare-IP production, no TLS
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.proxy.yml   → production behind Caddy + Let's Encrypt
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml     → development
+#
+# Caddy gets its own certificates from Let's Encrypt for the domains listed in
+# ./Caddyfile and reverse-proxies to the UI and MinIO over the internal
+# app-network. None of drive-osx-ui, drive-osx-api or minio publish a host
+# port any more once this file is layered on (the `ports: !override []`
+# below) — only Caddy is reachable from outside, on 80/443. The API's own
+# port is closed too: the UI's nginx already proxies /api and /ws to it
+# internally, so there is no reason to also reach it directly in plaintext.
+#
+# drive-osx-mail is unaffected: SMTP isn't HTTP, so it keeps terminating its
+# own STARTTLS with the cert in ./drive-osx-mail/tls (see README "Mail" and
+# drive-osx-mail/scripts/generate-dkim-key.sh) and stays published on
+# SMTP_PORT directly.
+#
+# NOTE: the `!override` tag below is load-bearing — Compose's default merge
+# for a list field is to concatenate/unique-merge it with the base file's
+# list, not replace it. Without `!override`, these services would keep
+# publishing their bare-IP ports alongside Caddy's. If an editor's YAML
+# formatter ever strips this tag on save, re-add it and re-run
+# `docker compose -f docker-compose.yml -f docker-compose.proxy.yml config`
+# to confirm ui/api/minio show no ports before deploying.
+services:
+  drive-osx-ui:
+    ports: !override []
+
+  drive-osx-api:
+    ports: !override []
+
+  minio:
+    ports: !override []
+
+  caddy:
+    # Debian-based, not -alpine: the Alpine variant's musl libc resolver has
+    # a documented bug where DNS lookups against Docker's embedded resolver
+    # (127.0.0.11) intermittently fail ("server misbehaving") under bursts of
+    # concurrent queries — exactly what happens when scanner/bot traffic hits
+    # right after a restart. glibc doesn't have this problem.
+    image: caddy:2.8
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      # Shared with certbot (scripts/issue-mail-cert.sh, renew-mail-cert.sh)
+      # so it can complete the ACME HTTP-01 challenge for mail.driveosx.com.
+      - ./certbot-webroot:/var/www/certbot:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      drive-osx-ui:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [app-network]
+
+volumes:
+  caddy-data:
+  caddy-config:

@@ -528,8 +528,16 @@ than assumed to exist:
   there is no `calendar` module and no `calendar_events` table (TASK-009).
 - **Mail folders and rules.** Messages are real; custom folders and filter
   rules in Mail Studio are still local placeholders (TASK-010).
-- **PDF Viewer file integration.** It opens bundled sample documents rather
-  than the user's own Drive files (TASK-011).
+- **PDF Viewer annotation persistence.** Since TASK-011 (2026-09-09) the
+  viewer renders real PDFs (bytes from Drive or the local filesystem) via
+  `pdfjs-dist` — the sample-data mock is gone. Highlights, underlines,
+  strikeouts, sticky notes, freehand ink and bookmarks are still in-memory
+  only; nothing persists across a reopen. Not yet its own tracked task.
+- **File Explorer open dispatch for Paint/Spreadsheet/Presentation/Browser.**
+  `EditorRegistry` maps their extensions correctly, but `handleOpenWithApp`
+  has no branch for any of the four, so opening one of these files from File
+  Explorer silently does nothing — the same class of bug TASK-011 fixed for
+  `pdf-viewer` (TASK-030).
 - **Frontend tests.** No test runner is configured for `drive-osx-ui`
   (TASK-014); see `docs/guides/testing.md`.
 
@@ -548,5 +556,5 @@ Which applications hold real, server-owned data, and which are local-only:
 | Meet | API (`/meetings`) + WebRTC | Server-owned |
 | Calendar | Browser only | Not persisted (TASK-009) |
 | Spreadsheet, Presentation, Paint | Browser only | Documents not yet stored in Drive |
-| PDF Viewer | Bundled samples | Not wired to Drive (TASK-011) |
+| PDF Viewer | API (`/files`) for a Drive-opened document; local filesystem otherwise | Documents are real; annotations/bookmarks are session-only, not persisted |
 | Calculator, Clock, Terminal, Browser | Browser only | Correct — no server state to hold |

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm test *)",
+      "Bash(echo \"prod exit: $?\")",
+      "Bash(python3 -c ' *)",
+      "Bash(timeout 25 docker pull hello-world)",
+      "Bash(curl -s -X POST http://localhost:3001/api/v1/register -H 'Content-Type: application/json' -d '{\"username\":\"testsender__TRACKED_VAR__\",\"password\":\"Password123!\",\"firstName\":\"Test\",\"lastName\":\"Sender\"}')",
+      "Bash(curl -s -X POST http://localhost:3001/api/v1/register -H 'Content-Type: application/json' -d '{\"username\":\"testsender__TRACKED_VAR__\",\"password\":\"Password123!\",\"firstName\":\"Test\",\"lastName\":\"Sender\",\"recoveryEmail\":\"testsender__TRACKED_VAR__@ext.example\"}')",
+      "Bash(curl -s -X POST http://localhost:3001/api/v1/login -H 'Content-Type: application/json' -d '{\"username\":\"testsender17406\",\"password\":\"Password123!\"}')"
+    ]
+  }
+}

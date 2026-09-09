@@ -23,9 +23,9 @@ UI rendering and user interaction are reasoned from source and are marked
 | -------- | ----- | ----- | --------- |
 | CRITICAL | 6     | 6     | 0         |
 | HIGH     | 8     | 8     | 0         |
-| MEDIUM   | 8     | 2     | 6         |
+| MEDIUM   | 9     | 3     | 6         |
 | LOW      | 6     | 2     | 4         |
-| **Total**| **28**| **18**| **10**    |
+| **Total**| **29**| **19**| **10**    |
 
 One CRITICAL (`TASK-020`) was found **by running the fixes**, not by reading
 the code — see below.
@@ -38,10 +38,14 @@ date, during shell work on window dragging and dock behaviour. `TASK-027` and
 `TASK-029` were raised, and fixed in the same change, on 2026-08-15 while
 verifying the Code Editor's new Prettier/ESLint integration (`TASK-028`, a
 feature note, not a defect — excluded from the counts above) via live browser
-automation. All are recorded here so the numbering stays the single sequence
-the rest of the documentation cites. This table is recounted from the task
-list below rather than incremented by hand — it had drifted once already,
-understating the count by three.
+automation. `TASK-011` was fixed on 2026-09-09 when the PDF Viewer was rebuilt
+from sample-data mock to a real `pdfjs-dist` viewer wired into
+`platform.files`; that same work surfaced `TASK-030`, a sibling gap in the
+other four app ids File Explorer's `handleOpenWithApp` still doesn't dispatch
+to. All are recorded here so the numbering stays the single sequence the rest
+of the documentation cites. This table is recounted from the task list below
+rather than incremented by hand — it had drifted once already, understating
+the count by three.
 
 ---
 
@@ -450,17 +454,56 @@ contacts module (TASK-005) once the app is next touched.
 
 ## TASK-011 — PDF Viewer ships sample documents
 
-* **Priority**: `MEDIUM`  **Status**: `OPEN (documented)`
-* **Module**: `drive-osx-ui` → `apps/pdf-viewer/data/samplePdfs.ts`
+* **Priority**: `MEDIUM`  **Status**: `FIXED` (2026-09-09)
+* **Module**: `drive-osx-ui` → `apps/pdf-viewer/`, `apps/file-explorer/index.tsx`, `platform/registry/EditorRegistry.tsx`, `shell/state/systemStore.tsx`
 
-**Problem.** The viewer lists built-in sample PDFs rather than the user's own
-files. It does not use `platform.files`, so a PDF in Drive cannot be opened
-through its own viewer.
+**Problem.** The viewer listed built-in sample PDFs (`data/samplePdfs.ts`, now
+deleted) rather than the user's own files. It did not use `platform.files`, so
+a PDF in Drive could not be opened through its own viewer — and separately,
+`EditorRegistry` already mapped `.pdf` → `pdf-viewer` correctly, but File
+Explorer's `handleOpenWithApp` had no branch for that app id, so double-clicking
+a real PDF was a silent no-op regardless.
 
-**Why deferred.** Requires wiring the viewer into the file-open path and the
-`EditorRegistry`; it is a feature integration, and the app is otherwise
-functional standalone. No data is fabricated *about the user* — the samples are
-clearly demo documents.
+**Fix.** Rebuilt the app on `pdfjs-dist` (declared in `package.json` since
+before this fix, but until now entirely unused — zero imports anywhere in
+`src/`) for real parsing, canvas rendering, text extraction and search. Added
+`pendingPdfViewerFiles` to the shell store, mirroring `pendingEditorWindowFiles`'s
+two open paths (reuse the primary window / force a new one), and wired File
+Explorer's `handleOpenWithApp` + `OpenWithModal.tsx` to actually act on
+`pdf-viewer` (previously OpenWithModal had no PDF option in its own list
+either). Added a "From Drive OSX" picker to the viewer's own toolbar via
+`requestFilePick` — the same mechanism Code Editor already used — alongside
+the existing native "From This Computer" file input. Download, Print and
+Share were also fake (JSON serialization, `window.print()` on synthetic HTML,
+and a fabricated share link respectively) and are now real: actual PDF bytes,
+the browser's native print dialog on the real blob, and the platform's real
+`/shares`-backed `ShareModal`.
+
+While rebuilding the annotation layer, found and fixed two more real bugs:
+highlight/underline/strikeout were built from a single `getBoundingClientRect()`
+of the whole selection, so a selection spanning a wrapped paragraph rendered
+one box stretched across every line instead of one box per line; and the
+picker-window open path had a focus-stealing bug (the parent window's own
+click-to-focus handler ran *after* the handler that opened and focused the
+picker, stealing focus straight back) — the same bug Code Editor had already
+hit and documented a fix for elsewhere, applied here with the same
+`e.stopPropagation()` guard.
+
+**Verification.** Live browser automation (Playwright): local-file open and
+page rendering, multi-line highlight/underline/strikeout positioning checked
+pixel-by-pixel against both a synthetic and a real-world PDF, hover-to-delete,
+full-text search, sticky notes, the password-protected unlock flow, and the
+Drive-picker's open → focus → title-update round trip. The Drive picker's
+actual byte fetch hit the real `/files` API surface (observed a live 500,
+handled correctly, with no backend running in this environment) but was not
+exercised against a fully running backend + object storage stack.
+
+**New, real limitation.** Highlights, underlines, strikeouts, sticky notes,
+freehand ink and bookmarks are in-memory (`useState`) only — nothing persists
+to the server or `localStorage`. Not tracked as its own task; noting it here
+so it isn't lost. `paint`, `spreadsheet`, `presentation` and `browser` still
+have the same `handleOpenWithApp` dispatch gap this task fixed for
+`pdf-viewer` — out of scope for this fix, not yet tracked as its own task.
 
 ---
 
@@ -693,3 +736,32 @@ count didn't drop to zero as expected.
 which fires on every fresh mount of the shared editor (Settings-close
 included), rather than relying solely on the `activeTabId`-keyed effect.
 `apps/code-editor/index.tsx`.
+
+---
+
+## TASK-030 — File Explorer double-click silently does nothing for Paint, Spreadsheet, Presentation and Browser files
+
+* **Priority**: `MEDIUM`  **Status**: `OPEN (documented)`
+* **Module**: `drive-osx-ui` → `apps/file-explorer/index.tsx`
+
+**Problem.** `EditorRegistry` correctly maps image/`csv`/`xlsx`/`xls`/`ppt`/
+`pptx`/`htm`/`html` extensions to `paint`, `spreadsheet`, `presentation` and
+`browser` respectively, but `handleOpenWithApp` in File Explorer has no branch
+for any of those four app ids — only `editor` and, as of TASK-011, `pdf-viewer`
+are handled. Double-clicking one of these files, or picking it from "Open
+With…", falls through every `if` and does nothing: no window opens, no error,
+no preview.
+
+**Found by** Investigating TASK-011 (the PDF Viewer had the identical gap for
+`pdf-viewer`) surfaced that the other four app ids have the same missing
+dispatch. Not independently reproduced against a live browser for this entry —
+found by source review of `handleOpenWithApp`, same as most of this document's
+`REVIEWED`-only findings.
+
+**Why deferred.** Scoped out of TASK-011, which fixed only the `pdf-viewer`
+case it was raised for. Each of the four remaining apps needs its own
+window-open mechanism analogous to `pendingEditorWindowFiles` /
+`pendingPdfViewerFiles` (Paint and Spreadsheet, at minimum, don't yet accept a
+`windowId`-scoped "open this specific file" payload at all — see their entries
+in `docs/reference/applications.md`, Part 2, "documents not yet stored in
+Drive"), so this is four small integration features, not one shared fix.

@@ -143,7 +143,8 @@ as well as Messenger) while working in production.
 | ------------- | ------------- | --- | ---------- | ------ |
 | Messenger | Contacts | `/contacts` (server) | Accepting a request creates both contact rows **in the acceptance transaction** | `VERIFIED` |
 | Messenger | Notification centre | `/notifications` | Request, acceptance and message notifications | `VERIFIED` |
-| File Explorer | Code Editor, PDF Viewer, Paint | `EditorRegistry` | Which app opens which MIME type | `REVIEWED` |
+| File Explorer | Code Editor, Paint | `EditorRegistry` | Which app opens which MIME type | `REVIEWED` |
+| File Explorer | PDF Viewer | `EditorRegistry` + `pendingPdfViewerFiles` (mirrors `pendingEditorWindowFiles`) | `.pdf` open, on double-click or "Open With…" | `VERIFIED (LIVE)` — `EditorRegistry` already mapped `.pdf` correctly, but `handleOpenWithApp` had no case for it, so the open silently did nothing; fixed 2026-09-09 (TASK-011). `paint`/`spreadsheet`/`presentation`/`browser` have the same `handleOpenWithApp` gap and remain unfixed — don't assume this row covers them. |
 | File Explorer | Trash | Shell store + `/files/trash` | Trashed items | `VERIFIED` |
 | Any app | Window manager | `platform.windows` | Open, focus, close | `REVIEWED` |
 | Window manager | Dock | `shell/taskbar/dockZone.ts` | Which window is being dragged, and whether it covers the dock's strip. Published per frame during a gesture **instead of** writing geometry to the shell store — see [Windows and the dock](../features/shell-windows-and-dock.md) | `VERIFIED (TEST)` |

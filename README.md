@@ -55,6 +55,7 @@ so nothing has to be assumed.
 | `postgres` | — | System of record |
 | `redis` | — | Cache, job queue, realtime fan-out |
 | `minio` | 9000 / 9001 | Object storage and its console |
+| `caddy` | — (80 / 443 in proxy mode) | TLS-terminating reverse proxy for a real-domain deployment; only present with `docker-compose.proxy.yml` — see "Production behind a real domain (TLS)" |
 
 ## Run everything with Docker (recommended)
 
@@ -85,8 +86,13 @@ One line in the root `.env` decides which stack `docker compose up` runs — no
 # datastore ports published on the host
 COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
 
-# production: compiled images only, nginx serving the shell, datastores internal
+# production, bare IP: compiled images only, nginx serving the shell,
+# datastores internal, no TLS
 COMPOSE_FILE=docker-compose.yml
+
+# production, real domain: the above, plus Caddy in front for automatic TLS —
+# see "Production behind a real domain (TLS)" below
+COMPOSE_FILE=docker-compose.yml:docker-compose.proxy.yml
 ```
 
 Each mode builds its own image tags (`drive-osx/api:dev` vs `drive-osx/api:prod`),
@@ -151,6 +157,88 @@ The API and worker run from the same image; only the command differs. Every
 image carries its own `HEALTHCHECK`, runs as a non-root user (`node`, or `nginx`
 for the UI), and uses an exec-form command so the process receives `SIGTERM`
 directly and shuts down gracefully.
+
+### Production behind a real domain (TLS)
+
+`docker-compose.proxy.yml` layers Caddy in front of bare-IP production
+(`docker-compose.yml`) for a deployment reachable at a real domain over HTTPS,
+including real inbound/outbound email. It gets its own certificates from
+Let's Encrypt automatically for the web-facing hosts, and stops publishing
+`drive-osx-ui`, `drive-osx-api` and `minio` directly — only Caddy is public,
+on 80/443.
+
+**DNS, before starting anything.** Point these at the host, using your own
+domain in place of `driveosx.com` (the placeholder used throughout
+`Caddyfile` and the scripts):
+
+| Record | Type | Points at |
+| --- | --- | --- |
+| `driveosx.com`, `www.driveosx.com` | A | the host — fronts the UI |
+| `storage.driveosx.com` | A | the host — fronts MinIO, for signed URLs the browser redeems directly (`STORAGE_PUBLIC_URL`) |
+| `mail.driveosx.com` | A | the host — SMTP hostname, and where its TLS cert is issued for (below) |
+| `driveosx.com` | MX | `mail.driveosx.com`, if you want to actually receive mail sent to `@driveosx.com` addresses from the outside world |
+
+**1. Point `.env` at the domain and the real SMTP port**, then start the stack:
+
+```sh
+# root .env
+COMPOSE_FILE=docker-compose.yml:docker-compose.proxy.yml
+SMTP_PORT=25
+STORAGE_PUBLIC_URL=https://storage.driveosx.com
+
+docker compose up --build
+```
+
+Caddy issues and renews the UI/storage certificates on its own — nothing
+further to do for those two. `driveosx.com`'s DNS must already resolve to the
+host before this `up`, or Caddy's ACME challenge fails.
+
+**2. Issue the mail certificate — a separate step, once.** SMTP isn't HTTP, so
+Caddy can't front `drive-osx-mail`'s STARTTLS the way it fronts the UI; the
+gateway terminates its own TLS from a certificate on disk. `Caddyfile` carries
+a passthrough block so certbot can complete the ACME HTTP-01 challenge for
+`mail.driveosx.com` without ever stopping Caddy:
+
+```sh
+./scripts/issue-mail-cert.sh    # after the stack above is up and Caddy is answering on :80
+docker compose restart drive-osx-mail
+```
+
+This writes `drive-osx-mail/tls/{fullchain,privkey}.pem` (gitignored) — see
+`TLS_KEY_PATH`/`TLS_CERT_PATH` in `drive-osx-mail/.env.example`. It uses
+`certbot certonly`, which does **not** auto-renew.
+
+**3. Set up renewal.** The issue script prints the exact crontab line; broadly:
+
+```sh
+0 3 1,15 * * /path/to/drive-osx/scripts/renew-mail-cert.sh >> /var/log/mail-cert-renew.log 2>&1
+```
+
+`certbot renew` only actually renews within 30 days of expiry, so running
+this often is harmless — most invocations do nothing. It restarts
+`drive-osx-mail` only when the certificate actually changed.
+
+**4. DKIM-sign outbound mail.** Real providers (Gmail, Outlook) are likely to
+reject or spam-bucket outbound mail with no valid DKIM signature — treat this
+as required for real-world delivery, not optional polish:
+
+```sh
+cd drive-osx-mail && ./scripts/generate-dkim-key.sh
+```
+
+This writes a keypair to `drive-osx-mail/secrets/` (gitignored) and prints
+the exact DNS TXT record to publish, plus the `DKIM_SELECTOR` /
+`DKIM_PRIVATE_KEY_PATH` values to set in `drive-osx-mail/.env`. Verify
+propagation with `dig TXT mail._domainkey.driveosx.com +short`.
+
+SPF and DMARC records improve deliverability further but nothing in this
+repository generates or checks them — publish those yourself if you need
+them; there is no tooling here to fall back on.
+
+**Everything above is optional.** Skip this whole section for local
+development or a bare-IP deployment — plain `docker-compose.yml` production
+serves mail on `localhost:1025`/`SMTP_PORT` with no TLS at all, which is fine
+until you're actually sending/receiving mail across the open internet.
 
 ## Ports and URLs
 
@@ -299,6 +387,21 @@ If deliveries start returning `401`, the token differs between
   older than the one that wrote `./data/minio`. MinIO cannot downgrade a data
   directory — move the pin in `docker-compose.yml` forward, or delete that
   folder to start fresh.
+- **Caddy can't get a certificate (`docker-compose.proxy.yml`).** DNS for the
+  domain must already resolve to the host before Caddy's first ACME request —
+  check with `dig +short driveosx.com`. Also confirm 80/443 are actually
+  reachable from the internet (not blocked by a cloud firewall/security
+  group) and that nothing else on the host is already bound to them.
+- **`issue-mail-cert.sh` / `renew-mail-cert.sh` fails the ACME challenge.**
+  Caddy must already be up and answering on `:80` first — the challenge is
+  served through `Caddyfile`'s `mail.driveosx.com` block, not by certbot
+  itself. Confirm `curl http://mail.driveosx.com/.well-known/acme-challenge/x`
+  reaches Caddy (a 404 from Caddy is fine; a connection failure means DNS or
+  the firewall, not certbot).
+- **Outbound mail lands in spam.** Missing or unpublished DKIM — run
+  `drive-osx-mail/scripts/generate-dkim-key.sh` and publish the TXT record it
+  prints, then verify with `dig TXT mail._domainkey.driveosx.com +short`. SPF
+  and DMARC records help too and are not generated by anything here.
 - **Start from a clean slate.** Postgres, Redis and MinIO data are bind-mounted
   to `./data/postgres`, `./data/redis` and `./data/minio` — `docker compose
   down -v` does **not** touch them (there are no named volumes left to remove).

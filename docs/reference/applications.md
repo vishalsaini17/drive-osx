@@ -9,7 +9,10 @@ Explorer, Code Editor and shell-Preferences entries were amended 2026-08-24
 from source review (not live probing) to reflect group chat, attachments,
 message actions, file-manager, and per-app-settings work landed since the
 original audit — those additions carry the same "UI unverified" caveat as
-the rest of Part 2 unless stated otherwise.
+the rest of Part 2 unless stated otherwise. The PDF Viewer entry was rewritten
+2026-09-09 after that app was rebuilt from a sample-data mock into a real
+pdf.js-backed viewer (TASK-011), and is the second entry additionally verified
+by live browser automation — see its own note below.
 
 ## How to read the status
 
@@ -159,6 +162,7 @@ the noted exception.
 * **Sharing** The Share dialog (`components/ShareModal.tsx`) is fully backed by the `/shares` API — "People with access" is loaded live, adding someone autocompletes against the sharer's contacts (`FileService.searchEligibleUsers`, debounced ~300ms), removing calls `revokeShare`, and the public-link tab creates/rotates a real token (opened at `/s/:token`, `shell/auth/ShareLinkPage.tsx`). A shared file/folder shows a small people-icon badge in the grid and list views (`item.isShared`), and "Shared with me" in the sidebar is a real `FileService.listSharedWithMe()` view rather than fixture data. Toolbar/context-menu actions are additionally hidden per `item.effectiveRole` as a UX hint — the `/files` and `/shares` APIs enforce the real rule server-side regardless.
 * **Implemented** Browse, upload, download (single file via a signed URL; multiple items or any folder via a server-streamed zip, `POST /files/download-zip`; a selection over 1GiB splits deterministically into several ≤1GiB zip parts, downloaded one after another), rename, move, duplicate (`POST /files/:fileId/duplicate` — a real server-side copy via `objectStorage.copy`, recursive for folders, capped at 2,000 descendants), trash, restore, share, properties, preview, open-with, multi-select, context menus
 * **Implemented, added 2026-08-22** File-type-aware icons and "Open With" filtering, both reading one shared `getFileKind()` map (`utils/fileType.ts`) so the two can no longer drift independently; "Shared with me" defaults to grouping by owner on entry (still user-changeable for that visit).
+* **Fixed 2026-09-09** `handleItemDoubleClick` already resolved `.pdf` → `pdf-viewer` via `EditorRegistry`, but `handleOpenWithApp` had no branch for that app id, so double-clicking a PDF was a silent no-op — see PDF Viewer, below (TASK-011). Also added a `pdf-viewer` entry (`kinds: ['pdf']`) to `OpenWithModal.tsx`'s own separate app list, which previously had none — a PDF's "Open With…" menu offered no relevant app at all. `paint`, `spreadsheet`, `presentation` and `browser` have the same `handleOpenWithApp` gap and were **not** touched by this fix — only `pdf-viewer` was in scope.
 * **Status** `WORKING` (data path verified via API; UI unverified)
 * **Risk** Low
 
@@ -231,8 +235,18 @@ the noted exception.
 
 ## PDF Viewer
 
-* **Status** `PARTIALLY_WORKING` — renders correctly, but lists bundled sample documents rather than the user's files (TASK-011)
-* **Risk** Low
+* **Location** `src/apps/pdf-viewer/` (2,285 lines)
+* **Uses** `pdfjs-dist` (Mozilla's PDF renderer, bundled locally with its own worker via a Vite `?url` import — no CDN fetch, offline-first per `CLAUDE.md` §18) for real parsing, canvas rendering and text extraction; `platform.files` (`FileService.getFile`/`downloadUrl`) to fetch a Drive file's actual bytes; the real File Explorer `ShareModal` (`apps/file-explorer/components/ShareModal.tsx`) for sharing, not a bespoke one
+* **Rebuilt 2026-09-09 (TASK-011).** Previously the entire app was a mock: `data/samplePdfs.ts` held three hand-written fake "documents" (JSON text posing as page content) with no relationship to any real file, `<canvas>` was used only for freehand-ink overlay, "Download" serialized that JSON instead of producing a PDF, "Print" ran `window.print()` on the fake HTML, "Share" fabricated a `studio.workspace.app` link that went nowhere, and File Explorer's `handleOpenWithApp` had no case for `pdf-viewer` at all — double-clicking a real PDF silently did nothing. All of that is gone. The app now:
+  * Renders real PDF bytes page-by-page to `<canvas>` via `pdfjs-dist`, with a real selectable/searchable text layer (`pdfjs-dist`'s `TextLayer`) positioned exactly over the glyphs — not synthesized text.
+  * Opens three ways: (1) double-click a `.pdf` in File Explorer — routed through the existing `EditorRegistry` (`pdf-viewer` was already mapped there; only the File Explorer dispatch was missing) into a new `pendingPdfViewerFiles` window-open mechanism mirroring `pendingEditorWindowFiles`'s two paths (reuse the primary window, or force a new one); (2) the toolbar's "Open PDF" split button → "From Drive OSX", which opens File Explorer as a real file picker (`requestFilePick`, the same mechanism Code Editor uses) filtered client-side to `.pdf`; (3) "From This Computer", a native `<input type=file>` reading local bytes with no Drive round-trip, or drag-and-drop onto the window.
+  * Supports real password-protected PDFs via pdf.js's own `PasswordException`/retry flow (`hooks/usePdfDocument.ts`) — not a hardcoded "drive" string.
+  * Highlight, underline and strikeout markup is built from the real text selection's `Range.getClientRects()` — one rect per visual line, so a selection spanning a paragraph wrap renders one box per line instead of a single box stretched across all of them (a real bug found and fixed this pass). Underline and strikeout are drawn as independently-positioned lines calibrated against pdf.js's glyph-cropped span boxes (not a full ascent-to-descent line box), so underline clears descenders and strikeout runs through glyph-middle rather than either landing mid-glyph. Hovering an annotation in Select mode shows a delete button directly on the page.
+  * Full-text search (`hooks/usePdfTextIndex.ts`) matches against each page's real extracted text, not fixture strings.
+  * Download produces the actual PDF bytes as a `Blob`; Print opens that same blob in a new tab for the browser's native print dialog; Share opens the platform's real `/shares`-backed dialog, but only for a document actually opened from Drive (has a real file id) — a locally-opened file is told to save to Drive first rather than pretending to generate a link for it.
+* **Known limitation.** Highlights, underlines, strikeouts, sticky notes, freehand ink and bookmarks are **in-memory `useState` only** — nothing is written to the server or to `localStorage`. Closing the window or reopening the same document loses all of it. This is a new, real gap (not present in the old mock, which had nothing to lose) and is not yet tracked as its own task.
+* **Status** `WORKING` — the second frontend entry in this document verified by **live browser automation** (Playwright): local-file open and real page rendering, multi-line highlight/underline/strikeout with corrected positioning verified pixel-by-pixel against both a synthetic and a real-world PDF's fonts, hover-to-delete, full-text search (toolbar button correctly switches the sidebar to Search and autofocuses it — previously a dead button), sticky notes, the password-protected unlock flow, and the Drive-file picker's open → focus → title-update round trip (a genuine focus-stealing bug was found and fixed in that path: the parent window's own click-to-focus handler was re-stealing focus from the freshly-opened picker window, the same bug Code Editor had already hit and fixed elsewhere — same `stopPropagation()` guard applied here). The Drive picker's actual byte-fetch was exercised against the real `/files` API surface (a live 500 was observed and handled correctly when no backend was running) but not against a fully running backend + object storage stack in this pass — same "not exercised against a live API" caveat most of Part 2 carries, scoped narrowly here to *fetching Drive bytes* rather than the open-wiring itself, which is verified.
+* **Risk** Low — annotation persistence is the one real gap, and it fails safely (data is simply not there next time, never corrupted or shown as saved when it isn't)
 
 ## Settings
 
@@ -241,6 +255,7 @@ the noted exception.
 
 ## Calculator, Clock, Terminal, Browser, Launcher
 
+* **Calculator, added 2026-09-09** A fifth mode, Financial (Loan/EMI, compound interest, simple interest, profit margin), alongside the existing Basic, Scientific, Programmer and Converter modes — same in-memory, no-server-state model as the rest of this group.
 * **Status** `WORKING` — local-only by nature; no server state is appropriate
 * **Risk** Low
 

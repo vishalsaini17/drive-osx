@@ -12,7 +12,11 @@ original audit — those additions carry the same "UI unverified" caveat as
 the rest of Part 2 unless stated otherwise. The PDF Viewer entry was rewritten
 2026-09-09 after that app was rebuilt from a sample-data mock into a real
 pdf.js-backed viewer (TASK-011), and is the second entry additionally verified
-by live browser automation — see its own note below.
+by live browser automation — see its own note below. The Paint Studio entry
+was rewritten 2026-09-10 after a tool-by-tool audit and fix pass (fill,
+raster/vector shape separation, resize handles, cursors, a duplication bug,
+flowchart drag, and real `FileService`-backed saving) and is the third entry
+additionally verified by live browser automation.
 
 ## How to read the status
 
@@ -228,10 +232,24 @@ the noted exception.
 * **Not working** **Nothing is persisted.** No `calendar` module, no `calendar_events` table. Events are per-browser and lost (TASK-009)
 * **Risk** High for user expectation — it looks like a real calendar and silently loses data
 
-## Spreadsheet / Presentation / Paint Studio
+## Spreadsheet / Presentation
 
-* **Status** `PARTIALLY_WORKING` — rich, working editors (formulas, charts, diagrams, layers) whose documents are **not stored in Drive**
+* **Status** `PARTIALLY_WORKING` — rich, working editors (formulas, charts) whose documents are **not stored in Drive**
 * **Risk** Medium — same expectation gap as Calendar
+
+## Paint Studio
+
+* **Location** `src/apps/paint-studio/` (raster drawing engine in `index.tsx`; vector flowchart layer in `components/DiagramLayer.tsx` + `utils/diagram.ts`)
+* **Audited and fixed 2026-09-10.** A full pass over every tool after user reports that several were broken or confusing:
+  * **Fill tool filled the background instead of the shape it was aimed at.** Root cause: the Shapes tool was implemented as a thin wrapper around the vector Flowchart system, so a "shape" was an SVG node, not pixels on the canvas — flood-fill (which only ever operates on the raster bitmap) had nothing of the shape to find. Fixed by making Shapes genuinely raster: `drawRasterShape()` strokes the shape's outline directly onto the canvas via `Path2D`, with no fill, so the user's own Fill tool now colours the actual enclosed pixels correctly. Shapes and Flowchart are now two fully separate systems — Shapes no longer touches `DiagramLayer`/`diagram.ts` at all, and Flowchart nodes (placed from the Flowchart panel) are unaffected raster-wise.
+  * **Resize-after-draw.** Finishing a shape now leaves it in an adjustable state — drag handles for width/height/corner-radius (reusing the existing vector-node `RESIZE_HANDLES`/`applyResize` machinery against the raster shape's rect) before it's committed to the bitmap; clicking elsewhere or switching tools commits it.
+  * **Shape palette expanded** from 6 to 15 options (rectangle, rounded-rect, ellipse, diamond, triangle, right-triangle, pentagon, hexagon, octagon, star, heart, speech-bubble, cross, line, arrow) — deliberately excludes the four shapes (parallelogram, capsule, cylinder, document) reserved for the separate Flowchart panel, so the two tools' palettes don't imply overlap that doesn't exist.
+  * **Per-tool cursors.** Each tool now shows a custom cursor built from that tool's own sidebar icon (exact lucide-react path data, e.g. the pen-tool cursor is a pen, the eraser is an eraser) instead of a generic crosshair; the Shapes-tool cursor is generated dynamically from `nodePath()` so it traces the actual outline of whichever shape is currently selected.
+  * **Shape-duplication bug.** Clicking away from a shape mid-adjustment (to dismiss the resize handles) fell through into the active tool's own pointer-down handler on the same click, drawing a fresh copy of the shape on top of the one just committed. Fixed with an early return once the pending adjustment is committed.
+  * **Flowchart nodes were unselectable/undraggable** for every non-rectangular shape (Decision/diamond, Preparation/hexagon, Data/parallelogram, Note/speech-bubble). Root cause: precise hit-testing uses the browser's `SVGGeometryElement.isPointInFill()` against a reusable `<path>` element that was never attached to the DOM — this browser silently returns `false` for a detached element regardless of valid geometry, so clicks (even dead-center) never registered, and a drag can't start without a successful hit-test. Fixed by attaching that element (zero-size, invisible, non-interactive) to `document.body` once on first use. Verified against all 8 `FLOWCHART_PRESETS`.
+  * **Save to Drive now really persists.** Previously "Save to Drive" only pushed a fake entry into local React state (`setFiles`), never reaching the server. It now calls `FileService.createFile`/`updateFile` against the real `/files` API, with a loading state and a user-facing error message on failure — the same pattern `code-editor` uses. **Scope of what's saved:** a flattened PNG export of the canvas (`composite().toDataURL('image/png')`), not the editable object graph — there is no load-an-existing-file-back-into-Paint-Studio path (see TASK-030), so a saved file opens elsewhere as a static image, not as a resumable Paint Studio document. It genuinely writes to Drive; it just isn't round-trippable yet.
+* **Status** `PARTIALLY_WORKING` — drawing/shape/flowchart tools now verified correct (Playwright regression sweep: raster fill-inside-shape, resize-after-draw, no-copy-on-click-away, all 8 flowchart presets draggable); Save to Drive writes a real file, but only as a flattened image, not an editable document, so the app still can't be reopened for further editing from Drive
+* **Risk** Low for the tools themselves (fixed and verified this pass); Medium for the save gap — a user who expects "Save to Drive" to mean "resume editing later" will be surprised it only produces a flat image
 
 ## PDF Viewer
 

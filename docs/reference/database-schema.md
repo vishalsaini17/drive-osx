@@ -156,9 +156,12 @@ Per CLAUDE.md §46 (introduce infrastructure only on concrete need) and the
 audit tracked in `docs/status/audit-and-plan.md`:
 
 * No `calendar_events` table — Calendar is browser-only (TASK-009).
-* No tables for Spreadsheet/Presentation/Paint documents — those apps don't
-  persist to Drive yet; only File Explorer/Code Editor read and write real
-  `files` rows.
+* No tables for Spreadsheet/Presentation documents — those apps don't
+  persist to Drive yet; only File Explorer/Code Editor/Paint Studio read and
+  write real `files` rows. Paint Studio's "Save to Drive" (fixed 2026-09-10)
+  writes a real `files` row via the same `FileService` API, but only a
+  flattened PNG export — there's still no schema or load path for its
+  editable object graph, so it needs no table of its own yet either.
 * No mail folder/rule tables — Mail Studio's custom folders and filter rules
   are local placeholders; only the `emails` row itself is server-owned.
 * No dedicated search engine or vector database — `files.search_vector` /

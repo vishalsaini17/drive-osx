@@ -537,7 +537,17 @@ than assumed to exist:
   `EditorRegistry` maps their extensions correctly, but `handleOpenWithApp`
   has no branch for any of the four, so opening one of these files from File
   Explorer silently does nothing — the same class of bug TASK-011 fixed for
-  `pdf-viewer` (TASK-030).
+  `pdf-viewer` (TASK-030). Unaffected by the 2026-09-10 Paint Studio fixes:
+  Paint Studio now writes real files via `FileService`, but still has no
+  "open this specific file" load path for File Explorer to dispatch into
+  even once this gap is closed.
+- **Paint Studio tool audit (2026-09-10).** Fill-tool-filled-the-background,
+  Shapes-tool-secretly-being-the-vector-Flowchart-system, unselectable
+  non-rectangular flowchart nodes, and a shape-duplication bug were all found
+  and fixed; see `docs/reference/applications.md` → Paint Studio for detail.
+  "Save to Drive" now genuinely persists via `FileService`, but only as a
+  flattened PNG export — there is still no round-trip back into an editable
+  Paint Studio document.
 - **Frontend tests.** No test runner is configured for `drive-osx-ui`
   (TASK-014); see `docs/guides/testing.md`.
 
@@ -555,6 +565,7 @@ Which applications hold real, server-owned data, and which are local-only:
 | Code Editor | API (`/files`) | Server-owned |
 | Meet | API (`/meetings`) + WebRTC | Server-owned |
 | Calendar | Browser only | Not persisted (TASK-009) |
-| Spreadsheet, Presentation, Paint | Browser only | Documents not yet stored in Drive |
+| Spreadsheet, Presentation | Browser only | Documents not yet stored in Drive |
+| Paint Studio | API (`/files`) for a flattened PNG export | Save genuinely persists (fixed 2026-09-10); no editable-document round trip yet |
 | PDF Viewer | API (`/files`) for a Drive-opened document; local filesystem otherwise | Documents are real; annotations/bookmarks are session-only, not persisted |
 | Calculator, Clock, Terminal, Browser | Browser only | Correct — no server state to hold |

@@ -23,9 +23,9 @@ UI rendering and user interaction are reasoned from source and are marked
 | -------- | ----- | ----- | --------- |
 | CRITICAL | 6     | 6     | 0         |
 | HIGH     | 8     | 8     | 0         |
-| MEDIUM   | 9     | 3     | 6         |
+| MEDIUM   | 10    | 4     | 6         |
 | LOW      | 6     | 2     | 4         |
-| **Total**| **29**| **19**| **10**    |
+| **Total**| **30**| **20**| **10**    |
 
 One CRITICAL (`TASK-020`) was found **by running the fixes**, not by reading
 the code — see below.
@@ -42,8 +42,10 @@ automation. `TASK-011` was fixed on 2026-09-09 when the PDF Viewer was rebuilt
 from sample-data mock to a real `pdfjs-dist` viewer wired into
 `platform.files`; that same work surfaced `TASK-030`, a sibling gap in the
 other four app ids File Explorer's `handleOpenWithApp` still doesn't dispatch
-to. All are recorded here so the numbering stays the single sequence the rest
-of the documentation cites. This table is recounted from the task list below
+to. `TASK-031` was raised and fixed on 2026-09-10 during a Paint Studio tool
+audit (fill, raster/vector shape separation, unselectable flowchart nodes, a
+shape-duplication bug, and a fake "Save to Drive"). All are recorded here so
+the numbering stays the single sequence the rest of the documentation cites. This table is recounted from the task list below
 rather than incremented by hand — it had drifted once already, understating
 the count by three.
 
@@ -761,7 +763,80 @@ found by source review of `handleOpenWithApp`, same as most of this document's
 **Why deferred.** Scoped out of TASK-011, which fixed only the `pdf-viewer`
 case it was raised for. Each of the four remaining apps needs its own
 window-open mechanism analogous to `pendingEditorWindowFiles` /
-`pendingPdfViewerFiles` (Paint and Spreadsheet, at minimum, don't yet accept a
-`windowId`-scoped "open this specific file" payload at all — see their entries
-in `docs/reference/applications.md`, Part 2, "documents not yet stored in
-Drive"), so this is four small integration features, not one shared fix.
+`pendingPdfViewerFiles` — none of them accept a `windowId`-scoped "open this
+specific file" payload at all yet. Paint Studio's Save-to-Drive was fixed
+2026-09-10 to genuinely write a `files` row (see
+`docs/reference/applications.md`, Part 2, "Paint Studio"), but that's a
+one-way flattened-PNG export with no matching load path, so this task is
+still fully open for all four apps, Paint Studio included.
+
+---
+
+## TASK-031 — Paint Studio: fill tool, shape/flowchart conflation, unselectable flowchart nodes, shape duplication, fake save
+
+* **Priority**: `MEDIUM`  **Status**: `FIXED` (2026-09-10)
+* **Module**: `drive-osx-ui` → `apps/paint-studio/index.tsx`, `apps/paint-studio/utils/diagram.ts`, `apps/paint-studio/types.ts`
+
+**Problem.** A user audit of every Paint Studio tool surfaced five distinct bugs:
+
+1. The Fill tool coloured the whole canvas background instead of the shape
+   the user clicked inside. Root cause: the Shapes tool was actually a thin
+   wrapper around the vector Flowchart system — a "shape" was an SVG node
+   with no representation on the raster bitmap, so flood-fill (which only
+   ever reads pixels) never found anything belonging to it.
+2. Shapes and Flowchart were the same system under the hood, so selecting a
+   shape from the Shapes panel silently behaved like placing a flowchart
+   node — not what a raster drawing tool should do, and confusing since the
+   two panels look and are labelled differently.
+3. Flowchart nodes with a non-rectangular outline (Decision/diamond,
+   Preparation/hexagon, Data/parallelogram, Note/speech-bubble) could not be
+   selected or dragged at all, not even by clicking dead-center.
+4. Clicking away from a just-drawn shape to dismiss its resize handles drew
+   a duplicate copy of the shape instead of just deselecting it.
+5. "Save to Drive" only pushed a fake entry into local React state
+   (`setFiles`) — it never called any API, so nothing was actually saved.
+
+**Fix.**
+
+* Made the Shapes tool genuinely raster: `drawRasterShape()` strokes the
+  shape's `Path2D` outline directly onto the canvas bitmap with no fill, so
+  the existing flood-fill logic now finds and fills the real enclosed
+  pixels. Shapes no longer touches `DiagramLayer`/`diagram.ts` — it is fully
+  independent of the vector Flowchart system now, fixing #1 and #2 together.
+* Added a resize-after-draw step: finishing a shape leaves it adjustable via
+  drag handles for width/height/corner-radius (reusing the existing vector
+  `RESIZE_HANDLES`/`applyResize` machinery against the raster shape's rect)
+  before it commits to the bitmap.
+* Expanded the shape palette from 6 to 15 (added right-triangle, pentagon,
+  octagon, cross, arrow, line, etc. — see `NodeShape` in `types.ts`), and
+  gave every tool a custom cursor built from its own sidebar icon (the
+  Shapes-tool cursor is generated dynamically from `nodePath()` to trace the
+  actual selected shape's outline).
+* Diagnosed #3 to `pointInNode()`'s use of `SVGGeometryElement.isPointInFill()`
+  against a reusable `<path>` element that was created but never attached to
+  the DOM — confirmed empirically that this browser returns `false`
+  unconditionally for a detached element regardless of valid path geometry,
+  so every non-bounding-box shape was unselectable, not merely imprecise to
+  hit. Fixed by lazily attaching that element (zero-size, invisible,
+  `pointer-events: none`) to `document.body` once on first use.
+* Fixed #4 with an early `return` once a pending shape adjustment is
+  committed, so the same click no longer falls through into the active
+  tool's own draw handler.
+* Fixed #5 by rewriting `saveToDrive()` to call `FileService.createFile`/
+  `updateFile` against the real `/files` API (tracking the returned file id
+  for subsequent saves to update in place), with a loading state and a
+  user-facing `alert()` on failure — the same pattern `code-editor` already
+  uses. **What's actually saved is a flattened PNG export** of the canvas,
+  not the editable node/edge/layer graph — there is still no load-an-
+  existing-file-back-in path (that's TASK-030, still open), so a Paint
+  Studio file opened elsewhere is a static image, not a resumable document.
+
+**Verification.** Live browser automation (Playwright) across a regression
+suite covering: fill-inside-a-raster-shape correctness, resize-after-draw
+handles, no-duplicate-on-click-away, a combined draw→resize→commit→fill
+workflow, and a sweep of all 8 `FLOWCHART_PRESETS` confirming each is now
+independently selectable and draggable. `tsc --noEmit` and `npm run build`
+both clean.
+
+**Not fixed by this task** — Paint Studio still cannot reopen a file it
+previously saved for further editing (TASK-030's scope, not this one's).

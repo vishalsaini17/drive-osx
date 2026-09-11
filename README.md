@@ -235,6 +235,29 @@ SPF and DMARC records improve deliverability further but nothing in this
 repository generates or checks them — publish those yourself if you need
 them; there is no tooling here to fall back on.
 
+**5. Route outbound mail through a relay, if port 25 is blocked outbound.**
+`drive-osx-mail` normally delivers direct-to-MX on port 25 — the receiving
+side's convention, not a choice this gateway makes. Several cloud providers
+(Oracle Cloud included) block *outbound* port 25 by default, which makes
+direct delivery impossible regardless of DNS/DKIM setup above. Inbound mail
+on port 25 (steps 1–4) is unaffected; only sending is blocked.
+
+The fix is an authenticated relay: `deliverViaSmtp()`
+(`drive-osx-mail/src/outbound/deliver.ts`) connects to `SMTP_RELAY_HOST`
+instead of resolving MX records whenever it's set — the whole switch between
+the two delivery layers is that one variable, so moving between them later is
+a config change in `drive-osx-mail/.env`, not a code change. On Oracle Cloud,
+point it at [OCI Email
+Delivery](https://docs.oracle.com/en-us/iaas/Content/Email/Concepts/overview.htm):
+approve `MAIL_DOMAIN` as a sender, publish the SPF/DKIM records its console
+gives you, generate SMTP credentials (Identity & Security → Domains → your
+domain → Users → your user → SMTP Credentials — not your OCI login), and set
+`SMTP_RELAY_HOST`/`PORT`/`USER`/`PASSWORD` in `drive-osx-mail/.env` — see the
+worked example in `drive-osx-mail/.env.example`. Once outbound port 25 opens
+on the host, clear those four variables to fall back to direct-to-MX
+delivery; the same relay switch works for any other authenticated provider
+(SendGrid, Mailgun, SES, Postmark, ...) too.
+
 **Everything above is optional.** Skip this whole section for local
 development or a bare-IP deployment — plain `docker-compose.yml` production
 serves mail on `localhost:1025`/`SMTP_PORT` with no TLS at all, which is fine

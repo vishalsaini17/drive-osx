@@ -258,6 +258,33 @@ on the host, clear those four variables to fall back to direct-to-MX
 delivery; the same relay switch works for any other authenticated provider
 (SendGrid, Mailgun, SES, Postmark, ...) too.
 
+**6. Approve every user's mailbox as an OCI sender, if you're on the Oracle
+relay.** OCI Email Delivery rejects mail whose `From:` header isn't one of
+its Approved Senders — checked per-message, with no domain-wide approval, so
+each `<username>@driveosx.com` created by signup needs its own approval.
+Approving by hand doesn't scale, so the API does it automatically: signup
+fires a `user.registered` domain event, its handler enqueues a
+`mail.register-sender` job (`drive-osx-api/src/workers/handlers.ts`), and
+that job calls `drive-osx-mail`'s `/provision-sender`
+(`src/relay-server.ts`), which registers the address with OCI's
+`CreateSender` API (`src/outbound/oci-senders.ts`, request-signed per
+[OCI's signing scheme](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/signingrequests.htm)
+— see `src/outbound/oci-signer.ts`). Runs from the background queue with
+retries, never on the signup request path, so a slow or unreachable relay
+provider can't block or fail registration.
+
+This needs its own OCI API credentials — separate from the SMTP credentials
+in step 5, since this authenticates OCI's control-plane API, not the SMTP
+connection. Use a dedicated OCI user scoped to nothing but
+`manage email-senders`, never your own login's key; the six
+`OCI_TENANCY_OCID`/`OCI_USER_OCID`/`OCI_API_KEY_FINGERPRINT`/
+`OCI_API_PRIVATE_KEY_PATH`/`OCI_REGION`/`OCI_EMAIL_COMPARTMENT_ID` variables
+and the exact console steps to get each one are documented in
+`drive-osx-mail/.env.example`. Left unset, `/provision-sender` no-ops
+successfully — fine for dev, and for any relay that doesn't require sender
+approval; once back to direct-to-MX delivery there's no such concept to
+satisfy either.
+
 **Everything above is optional.** Skip this whole section for local
 development or a bare-IP deployment — plain `docker-compose.yml` production
 serves mail on `localhost:1025`/`SMTP_PORT` with no TLS at all, which is fine

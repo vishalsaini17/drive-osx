@@ -276,7 +276,9 @@ provider can't block or fail registration.
 This needs its own OCI API credentials — separate from the SMTP credentials
 in step 5, since this authenticates OCI's control-plane API, not the SMTP
 connection. Use a dedicated OCI user scoped to nothing but
-`manage email-senders`, never your own login's key; the six
+`manage approved-senders`, never your own login's key (`email-senders` looks
+like the obvious resource-type name but isn't a real one — confirmed the
+hard way, via "No permissions found"); the six
 `OCI_TENANCY_OCID`/`OCI_USER_OCID`/`OCI_API_KEY_FINGERPRINT`/
 `OCI_API_PRIVATE_KEY_PATH`/`OCI_REGION`/`OCI_EMAIL_COMPARTMENT_ID` variables
 and the exact console steps to get each one are documented in
@@ -284,6 +286,33 @@ and the exact console steps to get each one are documented in
 successfully — fine for dev, and for any relay that doesn't require sender
 approval; once back to direct-to-MX delivery there's no such concept to
 satisfy either.
+
+**7. Testing real delivery from dev, without touching production config.**
+Dev always routes outbound mail to Mailpit by default — a plain
+`docker compose up` must never send real mail by accident, since dev is
+where typos, repeated test sends, and exploratory clicking happen. That
+safety net has a sharp edge worth knowing about: `drive-osx-mail`'s relay
+connection requires STARTTLS whenever credentials are present
+(`deliver.ts`), and Mailpit doesn't support STARTTLS at all — so if dev ever
+carried real relay credentials through to Mailpit's host, every dev send
+would fail outright with a `STARTTLS ... Command not implemented` error. It
+doesn't: `docker-compose.dev.yml` explicitly clears `SMTP_RELAY_USER`/
+`PASSWORD`/`ENVELOPE_FROM` rather than just leaving them to whatever
+`drive-osx-mail/.env` happens to hold, so dev stays isolated regardless of
+what production credentials get added there later.
+
+To deliberately test real delivery anyway (e.g. confirming a signup's
+address actually reaches Gmail), set `DEV_SMTP_RELAY_HOST`/`PORT`/`USER`/
+`PASSWORD`/`ENVELOPE_FROM` in the root `.env` (same values as step 5's
+`drive-osx-mail/.env` settings) and `docker compose up -d drive-osx-mail` —
+`docker-compose.dev.yml`'s `${DEV_SMTP_RELAY_HOST:-mailpit}`-style defaults
+mean this is the only file that ever needs changing, never the committed
+compose file. Clear those five again afterward (and restart) to go back to
+Mailpit; since root `.env` is gitignored, forgetting to clear them only
+affects your own machine, never anyone else's checkout. `docker compose
+restart` does **not** pick up `.env` changes — it reuses the already-created
+container's environment; use `docker compose up -d <service>` instead, which
+recreates it.
 
 **Everything above is optional.** Skip this whole section for local
 development or a bare-IP deployment — plain `docker-compose.yml` production

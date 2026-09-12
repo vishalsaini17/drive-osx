@@ -117,10 +117,27 @@ services:
       API_BASE_URL: http://drive-osx-api:7000
       # Real port-25 delivery does not work from a dev machine (blocked
       # outbound, no reverse DNS, no sending reputation) — send everything to
-      # Mailpit's catch-all inbox instead. Unset in production, where real MX
-      # lookups are required (see docker-compose.yml).
-      SMTP_RELAY_HOST: mailpit
-      SMTP_RELAY_PORT: 1025
+      # Mailpit's catch-all inbox instead, by default. Every DEV_SMTP_RELAY_*
+      # below defaults to Mailpit's own (safe, unauthenticated) settings, so
+      # a plain `docker compose up` can never send real mail by accident.
+      #
+      # To deliberately test real delivery from dev instead (e.g. confirming
+      # a signup's address actually reaches Gmail), set these five in the
+      # *root* .env — never in this file, which is committed — then
+      # `docker compose up -d drive-osx-mail`:
+      #   DEV_SMTP_RELAY_HOST=smtp.email.<region>.oci.oraclecloud.com
+      #   DEV_SMTP_RELAY_PORT=587
+      #   DEV_SMTP_RELAY_USER=<SMTP credential username>
+      #   DEV_SMTP_RELAY_PASSWORD=<SMTP credential password>
+      # Then clear all four in the root .env and `docker compose up -d
+      # drive-osx-mail` again to go back to Mailpit. See
+      # DEV_SMTP_RELAY_HOST in .env.example for the full explanation.
+      SMTP_RELAY_HOST: ${DEV_SMTP_RELAY_HOST:-mailpit}
+      SMTP_RELAY_PORT: ${DEV_SMTP_RELAY_PORT:-1025}
+      SMTP_RELAY_USER: ${DEV_SMTP_RELAY_USER:-}
+      SMTP_RELAY_PASSWORD: ${DEV_SMTP_RELAY_PASSWORD:-}
+      SMTP_RELAY_ENVELOPE_FROM: ${DEV_SMTP_RELAY_ENVELOPE_FROM:-}
+
     volumes:
       - type: bind
         source: ./drive-osx-mail

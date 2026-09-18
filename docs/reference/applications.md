@@ -271,9 +271,10 @@ the noted exception.
 * **Status** `PARTIALLY_WORKING` — preferences persist to `localStorage`, not to the user profile, so they do not follow the account to another device
 * **Risk** Low
 
-## Calculator, Clock, Terminal, Browser, Launcher
+## Calculator, Converter, Clock, Terminal, Browser, Launcher
 
 * **Calculator, added 2026-09-09** A fifth mode, Financial (Loan/EMI, compound interest, simple interest, profit margin), alongside the existing Basic, Scientific, Programmer and Converter modes — same in-memory, no-server-state model as the rest of this group.
+* **Converter, added 2026-09-11** A standalone utilities app at `/converter`, registered through the same application registry, launcher and desktop-window system as every other app. It shares its conversion component with Calculator's retained Unit Converter mode, so the two surfaces stay functionally consistent without duplicating the conversion logic. Currency values are static reference rates, not live market data.
 * **Status** `WORKING` — local-only by nature; no server state is appropriate
 * **Risk** Low
 

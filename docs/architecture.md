@@ -568,4 +568,4 @@ Which applications hold real, server-owned data, and which are local-only:
 | Spreadsheet, Presentation | Browser only | Documents not yet stored in Drive |
 | Paint Studio | API (`/files`) for a flattened PNG export | Save genuinely persists (fixed 2026-09-10); no editable-document round trip yet |
 | PDF Viewer | API (`/files`) for a Drive-opened document; local filesystem otherwise | Documents are real; annotations/bookmarks are session-only, not persisted |
-| Calculator, Clock, Terminal, Browser | Browser only | Correct — no server state to hold |
+| Calculator, Converter, Clock, Terminal, Browser | Browser only | Correct — no server state to hold |

@@ -274,7 +274,7 @@ the noted exception.
 ## Calculator, Converter, Clock, Terminal, Browser, Launcher
 
 * **Calculator, added 2026-09-09** A fifth mode, Financial (Loan/EMI, compound interest, simple interest, profit margin), alongside the existing Basic, Scientific, Programmer and Converter modes — same in-memory, no-server-state model as the rest of this group.
-* **Converter, added 2026-09-11** A standalone utilities app at `/converter`, registered through the same application registry, launcher and desktop-window system as every other app. It shares its conversion component with Calculator's retained Unit Converter mode, so the two surfaces stay functionally consistent without duplicating the conversion logic. Currency values are static reference rates, not live market data.
+** **Converter, added 2026-09-11** A standalone utilities app at `/converter`, registered through the same application registry, launcher and desktop-window system as every other app. It provides length, weight, temperature, currency and storage conversion, plus local Encrypt / Decrypt utilities. The security utility currently supports AES-256-GCM with PBKDF2/SHA-256 key derivation and Base64 encoding/decoding. Currency values are static reference rates, not live market data.
 * **Status** `WORKING` — local-only by nature; no server state is appropriate
 * **Risk** Low
 

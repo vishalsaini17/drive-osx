@@ -8,7 +8,7 @@
 | Backend E2E (HTTP) | `tests/e2e/*.sh` | 103 assertions | Passing |
 | SMTP gateway unit | `drive-osx-mail` vitest | address parsing | Passing |
 | Frontend unit | — | 0 | **Absent** (TASK-014) |
-| Frontend E2E | — | 0 | **Absent** |
+| Frontend E2E | — | 0 | **Absent** — including for phone/tablet layout (see §4) |
 | Backend integration (live DB) | — | 0 | **Absent** (TASK-016) |
 
 ## The lesson this plan is built on
@@ -200,6 +200,28 @@ a browser:
 
 Offline behaviour is a stated architectural requirement (CLAUDE.md §18–20), so
 this is the most valuable browser-level suite to build first.
+
+### Responsive layout
+
+Phone and tablet layout was verified by driving each application in Chromium
+through Playwright — 360 and 390px for phones, 768px for tablets, 1440px for a
+desktop regression — but those scripts lived in a session scratchpad, not the
+repository, so **nothing about it is re-runnable and nothing would fail if it
+regressed**. It is the same gap as TASK-014 and is the natural first use of that
+harness. What the scripts did, so they can be rebuilt:
+
+* log in, open the app, set the viewport;
+* scan every element and fail on `getBoundingClientRect().right > innerWidth`
+  — a *closed* layout can be in bounds while its open dropdown is not, so run
+  the scan again with each menu, drawer and dropdown open;
+* open every drawer and assert it closes on item select, backdrop tap **and** a
+  second tap of its toggle;
+* draw by pointer drag on a canvas surface and count non-background pixels;
+* for OSX Meet, launch Chromium with `--use-fake-ui-for-media-stream
+  --use-fake-device-for-media-stream` and grant `camera` and `microphone`.
+
+Not covered by any of it: a real touchscreen, iOS Safari, the on-screen keyboard
+resizing the viewport, rotation, safe-area insets, and multi-participant Meet.
 
 ### Media and camera teardown
 

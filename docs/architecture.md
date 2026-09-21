@@ -246,6 +246,28 @@ table, and the traps that make the obvious implementation wrong — is in
 [Windows and the dock](features/shell-windows-and-dock.md). Read it before
 changing `shell/window-manager/` or `shell/taskbar/`.
 
+### Phones and tablets
+
+The window manager is a desktop concept, so below desktop widths the shell and
+every responsive application change model rather than shrink. There are three
+tiers, decided by the **browser viewport** and not by an application's window:
+phone (`< 640px`, every window forced maximized), tablet (`640–1023px`, windows
+clamped to the viewport) and desktop (`≥ 1024px`, unchanged). Below 1024px the dock
+hides while any app is open instead of reacting to window geometry and hover.
+
+Applications answer "is this a phone or tablet?" with
+`platform/layout/useViewportWidth.ts`, and "is my window narrow?" with
+`useContainerWidth.ts` — the two questions have different answers, because a
+default desktop window is often narrower than a landscape tablet. A small set of
+patterns is shared: overlay drawers for sidebars, `⋯` overflow menus for
+toolbars, the in-app `design-system/components/SelectMenu.tsx` in place of native
+`<select>`, and Pointer Events for anything drawn by touch.
+
+Fourteen applications were converted on 2026-09-21; Spreadsheet, Presentation,
+Browser, Terminal and the Launcher app were not. See
+[Phones and tablets](features/responsive-layout.md) before changing layout in any
+application.
+
 ### Theming
 
 Two independent inputs can decide whether something renders light or dark — the

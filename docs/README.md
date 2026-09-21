@@ -44,6 +44,7 @@ Two documents live outside this folder on purpose:
 | To verify a change | [guides/testing.md](guides/testing.md) |
 | To know why something was done this way | [architecture/decisions/](architecture/decisions/) |
 | To follow one feature end to end | [features/](features/) |
+| To make an app work on a phone or tablet | [features/responsive-layout.md](features/responsive-layout.md) |
 | To know what is broken or missing | [status/audit-and-plan.md](status/audit-and-plan.md) |
 
 ## Feature guides
@@ -52,6 +53,7 @@ Two documents live outside this folder on purpose:
 | ------- | -------- |
 | Windows, dragging, resizing, dock visibility | [features/shell-windows-and-dock.md](features/shell-windows-and-dock.md) |
 | Direct messaging, chat requests, contacts, presence | [features/messaging-and-contacts.md](features/messaging-and-contacts.md) |
+| Phone and tablet layout — tiers, which signal to use, shared patterns, per-app behaviour | [features/responsive-layout.md](features/responsive-layout.md) |
 
 ## Status documents
 

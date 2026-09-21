@@ -126,6 +126,12 @@ A window resting exactly on the boundary does **not** count as covering it.
 | The covering window is minimized or closed | visible |
 | The launcher window covers the strip | ignored — the launcher never hides the dock |
 
+**This table is the desktop (`≥ 1024px`) behaviour.** Below 1024px the dock is
+keyed to whether any app is open at all — hidden while one is open and not
+minimized, visible again when it is minimized or closed — because touch has
+neither the hover reveal nor windows that reliably cover the strip. See
+[Phones and tablets](responsive-layout.md#why-the-dock-hides-differently-below-1024px).
+
 The 15px difference between the reveal threshold (bottom 10px) and the hide
 threshold (strip + 15px) is deliberate hysteresis: without it the dock would
 flicker as the cursor moved onto the dock it had just revealed.
@@ -184,7 +190,10 @@ gesture ended cannot cancel someone else's.
    `platform/layout/useContainerWidth.ts`, which observes the element itself.
    The Contacts detail pane was fixed this way; thirteen applications still
    carry the latent bug, tracked as TASK-025 in
-   [the audit](../status/audit-and-plan.md).
+   [the audit](../status/audit-and-plan.md). The exception is deciding whether
+   the *device* is a phone or tablet: that is a viewport question, answered by
+   `platform/layout/useViewportWidth.ts` — see
+   [Phones and tablets](responsive-layout.md#2-which-signal-to-lay-out-against).
 7. **Watch hook order.** There is no ESLint in this repository, so
    `react-hooks/rules-of-hooks` never runs. A hook placed after an early
    `return null` crashes the whole tree — this is exactly how right-clicking the
@@ -222,3 +231,5 @@ not an oversight.
 | Visibility decision, reveal-on-hover, dock rendering | `shell/taskbar/Dock.tsx` |
 | Window geometry, focus, maximize/minimize | `shell/state/systemStore.tsx` |
 | Container-width measurement for applications | `platform/layout/useContainerWidth.ts` |
+| Viewport-width (phone/tablet vs desktop) measurement | `platform/layout/useViewportWidth.ts` |
+| Force-maximize below 640px, clamp on tablets | `shell/state/systemStore.tsx` (`MOBILE_WINDOW_BREAKPOINT`, `clampWindowsToViewport`) |

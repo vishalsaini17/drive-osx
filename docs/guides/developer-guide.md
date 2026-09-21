@@ -144,6 +144,18 @@ overlap. Applications must measure themselves with
 `platform/layout/useContainerWidth.ts`. The Contacts detail pane was fixed this
 way; thirteen applications still carry the latent bug (TASK-025).
 
+**A phone or tablet is a different question from a narrow window.** The
+paragraph above is about a *window* being narrow. Whether the *device* is a phone
+or tablet is answered by the viewport — `platform/layout/useViewportWidth.ts`
+(`< 1024` compact, `< 640` phone) — because a default desktop window can be
+narrower than a landscape tablet, so measuring the window would put every desktop
+user in compact mode. Below 640px the shell forces every window maximized. Use the
+shared patterns (overlay drawer, `⋯` overflow menu, `SelectMenu`, Pointer Events),
+attach outside-tap listeners in the **capture** phase because the window shell
+stops propagation of events that start inside a window, and gate every
+compact-only change so desktop renders as before. The full rules are in
+[Phones and tablets](../features/responsive-layout.md).
+
 **Tailwind only generates classes it can see as literal text.** A class
 assembled at runtime never exists:
 
@@ -226,6 +238,7 @@ Then update the documentation in the same change:
 | The schema | `docs/overview.md` §4 migration table |
 | Application status or capability | `docs/reference/applications.md` |
 | Shell, window or dock behaviour | `docs/features/shell-windows-and-dock.md` |
+| Phone/tablet layout, or a shared responsive pattern | `docs/features/responsive-layout.md` |
 | How one feature works end to end | a doc in `docs/features/` |
 | A significant decision | a new `docs/architecture/decisions/ADR-*.md` |
 | Fixed or found a defect | `docs/status/audit-and-plan.md` |

@@ -44,7 +44,11 @@ from sample-data mock to a real `pdfjs-dist` viewer wired into
 other four app ids File Explorer's `handleOpenWithApp` still doesn't dispatch
 to. `TASK-031` was raised and fixed on 2026-09-10 during a Paint Studio tool
 audit (fill, raster/vector shape separation, unselectable flowchart nodes, a
-shape-duplication bug, and a fake "Save to Drive"). All are recorded here so
+shape-duplication bug, and a fake "Save to Drive"). `TASK-032` was raised and
+completed on 2026-09-21: a phone/tablet responsive pass over fourteen
+applications and the shell (a feature note like `TASK-028`, so it is excluded from
+the counts above, though it fixed several defects found along the way and leaves
+some gaps recorded in its own entry). All are recorded here so
 the numbering stays the single sequence the rest of the documentation cites. This table is recounted from the task list below
 rather than incremented by hand — it had drifted once already, understating
 the count by three.
@@ -646,6 +650,20 @@ replaced outright by `apps/code-editor` on 2026-08-15, not renamed in place.
 The new app has none of this pattern (confirmed by re-grepping), so it's
 dropped from this table rather than carried forward as a stale reference.
 
+**Update 2026-09-21.** A phone/tablet pass (`TASK-032`) has since touched most of
+the applications in this table (OSX Meet, Calendar, Mail Studio, Settings,
+Calculator, Clock, PDF Viewer, Contacts). It did not systematically remove
+viewport-prefixed classes and **the table above was not recounted**, so treat
+the numbers as the audit-date figures. What changed is the guidance: deciding
+whether the *device* is a phone or tablet is a viewport question and is now
+answered by `platform/layout/useViewportWidth.ts`, while *window-relative*
+layout must still use container width — see
+[Phones and tablets](../features/responsive-layout.md#2-which-signal-to-lay-out-against).
+Below 640px a window equals the viewport, so a `sm:`/`max-sm:` prefix is
+correct there and was used deliberately; the remaining risk is a prefixed class
+that shapes a desktop window's own layout. Still open, and now with an unmodified
+list: Spreadsheet, Presentation, Browser, Terminal and the Launcher app.
+
 Twelve applications, ~147 occurrences. Not every one is a visible defect —
 a prefix on an element that never gets narrow is harmless — so this needs
 triage per application rather than a blanket replacement. Messenger and Mail
@@ -840,3 +858,68 @@ both clean.
 
 **Not fixed by this task** — Paint Studio still cannot reopen a file it
 previously saved for further editing (TASK-030's scope, not this one's).
+
+---
+
+## TASK-032 — Phone and tablet layout for the shell and fourteen applications
+
+* **Priority**: `MEDIUM`  **Status**: `FIXED` for the applications listed; `OPEN` for the five that were not touched, and for the gaps below (2026-09-21)
+* **Module**: `drive-osx-ui` → `shell/taskbar/`, `shell/launcher/`, `App.tsx`, `platform/layout/useViewportWidth.ts`, `design-system/components/SelectMenu.tsx`, and the applications below
+
+**Problem.** Below desktop widths the platform was unusable: toolbars ran off the
+right edge with their last controls unreachable, sidebars left a form a sliver of
+width, fixed-pixel documents and canvases demanded horizontal scrolling, popups
+opened partly off-screen, native dropdowns did the same, and the dock sat on top
+of a running app on tablets. `CLAUDE.md` §44 requires a mobile-native navigation
+model rather than the desktop chrome shrunk down.
+
+**Fix.** Done one application at a time, in this order: the shell (dock hides while
+an app is open below 1024px; icon sizes per tier; popup anchoring), File Explorer,
+Clock, Calendar, Calculator, Word Book, Paint Studio, Settings, Trash Bin,
+Contacts, PDF Viewer, Mail Studio, Messenger, Editor, and OSX Meet. The shared
+pieces are the tier model, `useViewportWidth`, and `SelectMenu`; the per-app
+behaviour and the reusable patterns are recorded in
+[Phones and tablets](../features/responsive-layout.md). Defects found and fixed on
+the way, each reported or reproduced before fixing:
+
+* Outside-tap listeners never fired inside a window — the window shell stops
+  propagation of events that start inside it. Fixed with capture-phase listeners
+  in PDF Viewer, Mail Studio, Messenger, Editor, OSX Meet and `SelectMenu`.
+* Mail Studio's sidebar toggle opened the drawer but could not close it.
+* The PDF zoom dropdown opened off-screen — the trigger for replacing every native
+  `<select>` on a phone with an in-app dropdown: `SelectMenu` (shared) for four
+  OSX Meet dropdowns, and a purpose-built category dropdown in Editor settings.
+* Messenger's per-message menu and reaction strip overflowed the right and bottom
+  edges at 360px.
+* Freehand drawing (PDF ink, OSX Meet whiteboard) used mouse events, so a finger
+  drag scrolled the page instead of drawing. Now Pointer Events with
+  `touch-action: none`.
+
+**Two changes are not gated to phones and tablets** and therefore alter desktop:
+the dock popup anchoring (`DockPopupPanel.tsx`, now a flat 12px from the screen
+edge at every width) and the File Explorer grid-view icon (40px → 32px). The
+first was a deliberate fix for an overflow that was also 4px away from occurring
+on desktop; the second may not have been intended to reach desktop. Both are
+described in the feature guide with how to gate them.
+
+**Still open.**
+
+* Spreadsheet, Presentation, Browser, Terminal and the Launcher app were not made
+  responsive.
+* PDF text-layer spans scale incorrectly at every size (pre-existing).
+* File Explorer's Drive folder-picker search input extends past the right edge at
+  390px.
+* OSX Meet was exercised with one participant only; multi-participant grids,
+  screen sharing and real device cameras/microphones are unchecked.
+* No responsive regression coverage exists — the Playwright scripts used were
+  scratch files (see TASK-014 and the *Responsive layout* section of
+  [the test plan](../guides/testing.md)).
+
+**Verification.** Each application was driven in Chromium through Playwright at
+phone widths (360/390px) and tablet width (768px), with off-screen element scans,
+opened menus and drawers, and reviewed screenshots; OSX Meet's matrix was exactly
+360/390/768/1440px including a desktop regression. `npx vite build` passed after
+the last edit. **Not verified:** any real phone or tablet, touch hardware, iOS
+Safari, the on-screen keyboard, rotation and safe-area insets. `tsc --noEmit`
+crashed in the session's environment (pre-existing, not investigated), so
+`vite build` was the only compile check.

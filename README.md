@@ -235,6 +235,85 @@ SPF and DMARC records improve deliverability further but nothing in this
 repository generates or checks them — publish those yourself if you need
 them; there is no tooling here to fall back on.
 
+**5. Route outbound mail through a relay, if port 25 is blocked outbound.**
+`drive-osx-mail` normally delivers direct-to-MX on port 25 — the receiving
+side's convention, not a choice this gateway makes. Several cloud providers
+(Oracle Cloud included) block *outbound* port 25 by default, which makes
+direct delivery impossible regardless of DNS/DKIM setup above. Inbound mail
+on port 25 (steps 1–4) is unaffected; only sending is blocked.
+
+The fix is an authenticated relay: `deliverViaSmtp()`
+(`drive-osx-mail/src/outbound/deliver.ts`) connects to `SMTP_RELAY_HOST`
+instead of resolving MX records whenever it's set — the whole switch between
+the two delivery layers is that one variable, so moving between them later is
+a config change in `drive-osx-mail/.env`, not a code change. On Oracle Cloud,
+point it at [OCI Email
+Delivery](https://docs.oracle.com/en-us/iaas/Content/Email/Concepts/overview.htm):
+approve `MAIL_DOMAIN` as a sender, publish the SPF/DKIM records its console
+gives you, generate SMTP credentials (Identity & Security → Domains → your
+domain → Users → your user → SMTP Credentials — not your OCI login), and set
+`SMTP_RELAY_HOST`/`PORT`/`USER`/`PASSWORD` in `drive-osx-mail/.env` — see the
+worked example in `drive-osx-mail/.env.example`. Once outbound port 25 opens
+on the host, clear those four variables to fall back to direct-to-MX
+delivery; the same relay switch works for any other authenticated provider
+(SendGrid, Mailgun, SES, Postmark, ...) too.
+
+**6. Approve every user's mailbox as an OCI sender, if you're on the Oracle
+relay.** OCI Email Delivery rejects mail whose `From:` header isn't one of
+its Approved Senders — checked per-message, with no domain-wide approval, so
+each `<username>@driveosx.com` created by signup needs its own approval.
+Approving by hand doesn't scale, so the API does it automatically: signup
+fires a `user.registered` domain event, its handler enqueues a
+`mail.register-sender` job (`drive-osx-api/src/workers/handlers.ts`), and
+that job calls `drive-osx-mail`'s `/provision-sender`
+(`src/relay-server.ts`), which registers the address with OCI's
+`CreateSender` API (`src/outbound/oci-senders.ts`, request-signed per
+[OCI's signing scheme](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/signingrequests.htm)
+— see `src/outbound/oci-signer.ts`). Runs from the background queue with
+retries, never on the signup request path, so a slow or unreachable relay
+provider can't block or fail registration.
+
+This needs its own OCI API credentials — separate from the SMTP credentials
+in step 5, since this authenticates OCI's control-plane API, not the SMTP
+connection. Use a dedicated OCI user scoped to nothing but
+`manage approved-senders`, never your own login's key (`email-senders` looks
+like the obvious resource-type name but isn't a real one — confirmed the
+hard way, via "No permissions found"); the six
+`OCI_TENANCY_OCID`/`OCI_USER_OCID`/`OCI_API_KEY_FINGERPRINT`/
+`OCI_API_PRIVATE_KEY_PATH`/`OCI_REGION`/`OCI_EMAIL_COMPARTMENT_ID` variables
+and the exact console steps to get each one are documented in
+`drive-osx-mail/.env.example`. Left unset, `/provision-sender` no-ops
+successfully — fine for dev, and for any relay that doesn't require sender
+approval; once back to direct-to-MX delivery there's no such concept to
+satisfy either.
+
+**7. Testing real delivery from dev, without touching production config.**
+Dev always routes outbound mail to Mailpit by default — a plain
+`docker compose up` must never send real mail by accident, since dev is
+where typos, repeated test sends, and exploratory clicking happen. That
+safety net has a sharp edge worth knowing about: `drive-osx-mail`'s relay
+connection requires STARTTLS whenever credentials are present
+(`deliver.ts`), and Mailpit doesn't support STARTTLS at all — so if dev ever
+carried real relay credentials through to Mailpit's host, every dev send
+would fail outright with a `STARTTLS ... Command not implemented` error. It
+doesn't: `docker-compose.dev.yml` explicitly clears `SMTP_RELAY_USER`/
+`PASSWORD`/`ENVELOPE_FROM` rather than just leaving them to whatever
+`drive-osx-mail/.env` happens to hold, so dev stays isolated regardless of
+what production credentials get added there later.
+
+To deliberately test real delivery anyway (e.g. confirming a signup's
+address actually reaches Gmail), set `DEV_SMTP_RELAY_HOST`/`PORT`/`USER`/
+`PASSWORD`/`ENVELOPE_FROM` in the root `.env` (same values as step 5's
+`drive-osx-mail/.env` settings) and `docker compose up -d drive-osx-mail` —
+`docker-compose.dev.yml`'s `${DEV_SMTP_RELAY_HOST:-mailpit}`-style defaults
+mean this is the only file that ever needs changing, never the committed
+compose file. Clear those five again afterward (and restart) to go back to
+Mailpit; since root `.env` is gitignored, forgetting to clear them only
+affects your own machine, never anyone else's checkout. `docker compose
+restart` does **not** pick up `.env` changes — it reuses the already-created
+container's environment; use `docker compose up -d <service>` instead, which
+recreates it.
+
 **Everything above is optional.** Skip this whole section for local
 development or a bare-IP deployment — plain `docker-compose.yml` production
 serves mail on `localhost:1025`/`SMTP_PORT` with no TLS at all, which is fine

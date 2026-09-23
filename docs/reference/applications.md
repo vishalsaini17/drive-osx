@@ -318,9 +318,10 @@ the noted exception.
 * **Status** `PARTIALLY_WORKING` — preferences persist to `localStorage`, not to the user profile, so they do not follow the account to another device
 * **Risk** Low
 
-## Calculator, Clock, Terminal, Browser, Launcher
+## Calculator, Converter, Clock, Terminal, Browser, Launcher
 
 * **Calculator, added 2026-09-09** A fifth mode, Financial (Loan/EMI, compound interest, simple interest, profit margin), alongside the existing Basic, Scientific, Programmer and Converter modes — same in-memory, no-server-state model as the rest of this group.
+** **Converter, added 2026-09-11** A standalone utilities app at `/converter`, registered through the same application registry, launcher and desktop-window system as every other app. It provides length, weight, temperature, currency and storage conversion, plus local Encrypt / Decrypt utilities. The security utility currently supports AES-256-GCM with PBKDF2/SHA-256 key derivation and Base64 encoding/decoding. Currency values are static reference rates, not live market data.
 * **Responsive, added 2026-09-21** *Calculator:* mode tabs become icon-only and History becomes an overlay drawer on a narrow window. *Clock:* the four-tab header drops to icons on a narrow window (both container-measured, so they also apply to a narrowed desktop window). Terminal, Browser and the Launcher app were **not** made responsive. Verified live at phone/tablet widths for Calculator and Clock.
 * **Status** `WORKING` — local-only by nature; no server state is appropriate
 * **Risk** Low

@@ -263,10 +263,11 @@ patterns is shared: overlay drawers for sidebars, `⋯` overflow menus for
 toolbars, the in-app `design-system/components/SelectMenu.tsx` in place of native
 `<select>`, and Pointer Events for anything drawn by touch.
 
-Fourteen applications were converted on 2026-09-21; Spreadsheet, Presentation,
-Browser, Terminal and the Launcher app were not. See
-[Phones and tablets](features/responsive-layout.md) before changing layout in any
-application.
+Fourteen applications were converted on 2026-09-21; Spreadsheet, Browser,
+Terminal and the Launcher app were not. Presentation was converted separately on
+2026-09-25, `useContainerWidth`-driven rather than `useViewportWidth`-driven like
+the fourteen above. See [Phones and tablets](features/responsive-layout.md)
+before changing layout in any application.
 
 ### Theming
 

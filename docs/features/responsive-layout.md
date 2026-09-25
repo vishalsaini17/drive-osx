@@ -197,11 +197,71 @@ desktop was meant to change. List-view (`small`) and the properties-panel (`xl`)
 icons are unchanged. To make it phone/tablet-only, gate the `large` size on
 `isMobileOrTabletView` inside `renderFileIcon`.
 
+### A later addition: Presentation (2026-09-25)
+
+Presentation was in the "Not done" list below until a separate, later session.
+Unlike the table above, it does not use `useViewportWidth` — it is entirely
+`useContainerWidth`-driven (like Contacts' pre-existing treatment), on two
+thresholds measured off the app's own root: `isTablet` at `< 760px` and
+`isMobile` at `< 520px`. That is a valid choice under §2 ("is this window
+narrow right now?"), not an oversight, but it does mean this app's compact
+mode also triggers on a desktop window dragged narrower than 760px, which the
+viewport-tiered apps above do not do.
+
+* **Header.** Below `isTablet`: the slide rail (`w-56`, fixed) becomes a toggle
+  drawer opened from a `☰` button; Share/Comments/Export/Save fold into a `⋯`
+  "more actions" menu (deliberately a different glyph from the drawer's `☰` —
+  two identical hamburgers next to each other in the header was the first
+  version of this fix, reported back as confusing/overlapping); Present stays
+  a standalone button. Below `isMobile`, the comments panel (`w-80`, fixed)
+  becomes a full-screen overlay instead of squeezing the canvas further.
+* **Presentation Mode** (`components/PresentationMode.tsx`) gets the same
+  treatment independently, via its own `useContainerWidth` on its own root: the
+  presenter-notes panel was `absolute right-6 ... w-96` (384px) — a real bug,
+  not just a layout preference, since that can run wider than a phone
+  viewport and be pushed off-screen. Below its `isCompact` (`< 760px`) it
+  becomes a bottom sheet instead.
+* **Slide canvas text (`components/SlideCanvas.tsx`), not tier-gated to this
+  app's own thresholds.** Every element's position/size is already a
+  percentage of the canvas, but `fontSize` was a flat pixel value — on a
+  canvas shrunk by a narrow window, unscaled text (e.g. a 36px title) no
+  longer fit the box it was designed for and spilled into the element below
+  it. This is now scaled by the canvas's own measured width against a
+  `REFERENCE_CANVAS_WIDTH` of 880px, clamped to never exceed `1`. That
+  reference is deliberately at or under the *smaller* of this canvas's two
+  real desktop sizes — the editor's `max-w-4xl` (896px) and Presentation
+  Mode's `max-w-5xl` (1024px) — so it is a genuine no-op at both call sites'
+  normal desktop width, not merely close to one; an earlier version of this
+  used a 960px reference, which is *between* those two widths and was
+  quietly shrinking editor text ~7% and enlarging Presentation Mode's text
+  ~7% at ordinary desktop size before that was caught and fixed. The table
+  element additionally moved to `table-layout: fixed` with `truncate` on each
+  cell — a `table-layout: auto` table (the default) does not shrink its
+  columns below their content's natural width, so at a narrow canvas it
+  rendered at its natural size and was cut off mid-character wherever it hit
+  the *canvas's* edge, not its own element box. Every element's own box also
+  gained `overflow-hidden` of its own (it previously relied solely on the
+  outer canvas's clipping), which is what produced that appearance in the
+  first place — the reported bug looked like "content overflowing the slide,"
+  but the root cause was that no individual element enforced its own bound.
+* **Verification.** `tsc --noEmit` is clean (this environment's default
+  Node stack size crashes on an unrelated pre-existing file; run with
+  `node --stack-size=8000 node_modules/typescript/lib/tsc.js --noEmit` to
+  reproduce that or confirm it's still isolated to a config/environment
+  issue). No Playwright or other browser automation was run in that session —
+  unlike the 2026-09-21 pass below, there is no automated matrix over 360 /
+  390 / 768 / 1440px for this app. The mobile-canvas table/chart overflow was
+  reported against a real Chrome DevTools device-emulation screenshot (Galaxy
+  A55, 360×800) and fixed from that, but the fix has not itself been
+  re-screenshotted to confirm. **Treat Presentation's compact-mode behaviour
+  as `REVIEWED`, not `VERIFIED (LIVE)`**, until someone drives it at 360,
+  ~640 and ~760px and confirms nothing sits past `innerWidth`.
+
 ### Not done
 
 | App | State |
 | --- | ----- |
-| Spreadsheet, Presentation, Browser, Terminal, Launcher app | **Not touched.** They render at desktop layout on every tier. |
+| Spreadsheet, Browser, Terminal, Launcher app | **Not touched.** They render at desktop layout on every tier. |
 
 ### Known gaps left on purpose
 

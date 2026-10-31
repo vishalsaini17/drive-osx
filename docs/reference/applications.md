@@ -30,8 +30,11 @@ browser (Playwright) for *layout and interaction at emulated viewport widths* �
 which does **not** upgrade any entry's own status line: an app whose status says
 "UI unverified" is still unverified for everything except its narrow-viewport
 layout. Spreadsheet, Presentation, Browser, Terminal and the Launcher app were not
-part of the pass. Full behaviour, method and gaps are in
-[Phones and tablets](../features/responsive-layout.md).
+part of the pass. **Presentation was given its own, separate responsive pass on
+2026-09-25** (see its entry below) — by a different method (typecheck and a
+user-reported screenshot, not Playwright), so it does not carry the same
+verification weight as the fourteen from this pass. Full behaviour, method and
+gaps are in [Phones and tablets](../features/responsive-layout.md).
 
 ## How to read the status
 
@@ -258,8 +261,9 @@ the noted exception.
 ## Spreadsheet / Presentation
 
 * **Status** `PARTIALLY_WORKING` — rich, working editors (formulas, charts) whose documents are **not stored in Drive**
-* **Responsive** Not done — renders at desktop layout on phones and tablets (2026-09-21).
-* **Risk** Medium — same expectation gap as Calendar
+* **Spreadsheet responsive** Not done — renders at desktop layout on phones and tablets (2026-09-21).
+* **Presentation responsive, added 2026-09-25** `useContainerWidth`-driven (not `useViewportWidth` like most of the 2026-09-21 pass — see [Phones and tablets §4](../features/responsive-layout.md#a-later-addition-presentation-2026-09-25)), on the app's own root at `< 760px` and `< 520px`. Slide rail becomes a toggle drawer; header actions fold into a `⋯` menu (kept visually distinct from the drawer's `☰`, after an earlier version with two hamburgers was reported as confusing); comments panel becomes a full overlay below `520px`; Presentation Mode's presenter-notes panel — previously a fixed 384px side panel that could run off a phone-width screen — becomes a bottom sheet. Separately, slide-canvas text/table font sizes now scale to the canvas's actual rendered width instead of a flat pixel value, which was the cause of a real bug: an unscaled title/table could overflow its own element box and only get clipped once it reached the canvas edge, reading as "content overflowing the slide." Verified only by `tsc --noEmit` (clean) and against a user-supplied screenshot at 360×800 that reproduced the bug being fixed; **not independently re-verified live** — no Playwright run for this app.
+* **Risk** Medium — same expectation gap as Calendar; Presentation's responsive fix in particular has not been re-screenshotted after the last edit
 
 ## Word Book
 

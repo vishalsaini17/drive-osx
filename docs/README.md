@@ -54,6 +54,7 @@ Two documents live outside this folder on purpose:
 | Windows, dragging, resizing, dock visibility | [features/shell-windows-and-dock.md](features/shell-windows-and-dock.md) |
 | Direct messaging, chat requests, contacts, presence | [features/messaging-and-contacts.md](features/messaging-and-contacts.md) |
 | Phone and tablet layout — tiers, which signal to use, shared patterns, per-app behaviour | [features/responsive-layout.md](features/responsive-layout.md) |
+| UI wireframes, theme architecture, UX workflows | [features/ui-design-and-theme.md](features/ui-design-and-theme.md) |
 
 ## Status documents
 

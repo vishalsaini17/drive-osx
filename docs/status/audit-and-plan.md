@@ -662,7 +662,11 @@ layout must still use container width — see
 Below 640px a window equals the viewport, so a `sm:`/`max-sm:` prefix is
 correct there and was used deliberately; the remaining risk is a prefixed class
 that shapes a desktop window's own layout. Still open, and now with an unmodified
-list: Spreadsheet, Presentation, Browser, Terminal and the Launcher app.
+list: Spreadsheet, Browser, Terminal and the Launcher app. (Presentation was not
+in the table above either — it had none at audit time — and was given its own
+compact-mode pass on 2026-09-25, entirely `useContainerWidth`-driven; a
+`grep -rE '\b(sm|md|lg|xl|2xl):' apps/presentation` confirms it still has zero
+viewport-prefixed classes after that pass.)
 
 Twelve applications, ~147 occurrences. Not every one is a visible defect —
 a prefix on an element that never gets narrow is harmless — so this needs
@@ -904,8 +908,11 @@ described in the feature guide with how to gate them.
 
 **Still open.**
 
-* Spreadsheet, Presentation, Browser, Terminal and the Launcher app were not made
-  responsive.
+* Spreadsheet, Browser, Terminal and the Launcher app were not made responsive.
+  (Presentation was in this list too until a separate pass on 2026-09-25 —
+  `useContainerWidth`-driven, not part of this task, and not verified live by
+  Playwright the way the apps above were; see
+  [Phones and tablets §4](../features/responsive-layout.md#a-later-addition-presentation-2026-09-25).)
 * PDF text-layer spans scale incorrectly at every size (pre-existing).
 * File Explorer's Drive folder-picker search input extends past the right edge at
   390px.

@@ -195,9 +195,8 @@ services:
   # S3-compatible object storage for file bytes. Swappable for S3/R2/GCS in
   # other environments — only STORAGE_* configuration changes.
   minio:
-    # Pinned, never `latest`. Note: MinIO cannot read a data directory written
-    # by a newer release, so only ever move this pin forward.
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # Pinned release; this is a third-party mirror, not the official publisher.
+    image: dappros/minio:RELEASE.2025-09-07T16-13-09Z
     <<: *hardening
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
